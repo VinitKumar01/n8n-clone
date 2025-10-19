@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Crimson_Text } from "next/font/google";
+import "reactflow/dist/style.css";
 import "./globals.css";
 import { ThemeProvider } from "../components/theme-provider";
-import Header from "@/components/header";
-import { Separator } from "@/components/ui/separator";
 import { ClerkProvider } from "@clerk/nextjs";
 
 const crimson = Crimson_Text({
@@ -32,8 +31,6 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <Header />
-            <Separator />
             {children}
           </ThemeProvider>
         </body>
