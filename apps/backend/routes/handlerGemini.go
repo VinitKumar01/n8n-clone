@@ -21,7 +21,11 @@ func HandlerGemini(w http.ResponseWriter, r *http.Request) {
 	params := parameters{}
 	decoder.Decode(&params)
 
-	result, err := nodes.GetGeminiResponse(r.Context(), params.Prompt, params.ApiKey, params.Model)
+	result, err := nodes.GetGeminiResponse(r.Context(), map[string]any{
+		"prompt": params.Prompt,
+		"apiKey": params.ApiKey,
+		"model":  params.Model,
+	}, nil)
 	if err != nil {
 		utils.RespondWithError(w, 400, fmt.Sprintf("Failed to fetch response from gemini: %v", err))
 		return
@@ -31,5 +35,5 @@ func HandlerGemini(w http.ResponseWriter, r *http.Request) {
 		Result string `json:"result"`
 	}
 
-	utils.RespondWithJson(w, 200, response{Result: result})
+	utils.RespondWithJson(w, 200, response{Result: utils.AnyToString(result)})
 }

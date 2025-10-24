@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -8,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type Callback func()
+type Callback func(context.Context, map[string]any) (any, error)
 
 type Scheduler struct {
 	mu   sync.Mutex
@@ -21,7 +22,7 @@ func NewScheduler() *Scheduler {
 	}
 }
 
-func (s *Scheduler) Start(duration time.Duration, fn Callback) string {
+func (s *Scheduler) Start(duration time.Duration, fn Callback, ctx context.Context, params map[string]any) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -39,7 +40,7 @@ func (s *Scheduler) Start(duration time.Duration, fn Callback) string {
 				fmt.Println("Stopped job:", id)
 				return
 			case t := <-ticker.C:
-				fn()
+				fn(ctx, params)
 				fmt.Println("Periodic job executed:", id, "at", t)
 			}
 		}
