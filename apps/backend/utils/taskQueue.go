@@ -29,7 +29,6 @@ func (q *taskQueue) EnqueueTask(taskFn TaskFn, params TaskParams) {
 
 func (q *taskQueue) Execute(ctx context.Context) error {
 	for id, task := range q.taskFns {
-		println(id)
 		var prevResult any
 		if id >= 1 {
 			prevResult = q.Results[id-1]
