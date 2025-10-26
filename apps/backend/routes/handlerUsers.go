@@ -12,7 +12,7 @@ import (
 	"github.com/vinitkumar01/n8n-clone/utils"
 )
 
-func (apiCfg ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request) {
+func (db Db) HandlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Username string `json:"username"`
 	}
@@ -26,7 +26,7 @@ func (apiCfg ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	user, err := apiCfg.DB.CreateUser(r.Context(), database.CreateUserParams{
+	user, err := db.Queries.CreateUser(r.Context(), database.CreateUserParams{
 		ID:        uuid.New(),
 		Username:  params.Username,
 		CreatedAt: time.Now().UTC(),
@@ -40,7 +40,7 @@ func (apiCfg ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request
 	utils.RespondWithJson(w, 201, utils.DatabaseUserToUser(user))
 }
 
-func (apiCfg ApiConfig) HandlerGetUserById(w http.ResponseWriter, r *http.Request) {
+func (db Db) HandlerGetUserById(w http.ResponseWriter, r *http.Request) {
 	idString := chi.URLParam(r, "userId")
 	id, err := uuid.Parse(idString)
 	if err != nil {
@@ -48,7 +48,7 @@ func (apiCfg ApiConfig) HandlerGetUserById(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user, err := apiCfg.DB.GetUserById(r.Context(), id)
+	user, err := db.Queries.GetUserById(r.Context(), id)
 	if err != nil {
 		utils.RespondWithError(w, 400, fmt.Sprintf("Error finding the user: %v", err))
 		return

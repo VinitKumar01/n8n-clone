@@ -5,6 +5,7 @@
 package database
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,14 @@ import (
 type User struct {
 	ID        uuid.UUID
 	Username  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type Workflow struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Nodes     json.RawMessage
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

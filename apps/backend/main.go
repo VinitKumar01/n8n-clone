@@ -36,9 +36,9 @@ func main() {
 		log.Fatal("Database connection failed:", err)
 	}
 
-	db := database.New(conn)
-	apiCfg := routes.ApiConfig{
-		DB: db,
+	queries := database.New(conn)
+	db := routes.Db{
+		Queries: queries,
 	}
 
 	router := chi.NewRouter()
@@ -54,8 +54,8 @@ func main() {
 
 	v1Router := chi.NewRouter()
 	v1Router.Get("/health", routes.HandlerReadiness)
-	v1Router.Post("/users", apiCfg.HandlerCreateUser)
-	v1Router.Get("/users/{userId}", apiCfg.HandlerGetUserById)
+	v1Router.Post("/users", db.HandlerCreateUser)
+	v1Router.Get("/users/{userId}", db.HandlerGetUserById)
 	v1Router.Get("/nodes/gemini", routes.HandlerGemini)
 
 	router.Mount("/v1", v1Router)
