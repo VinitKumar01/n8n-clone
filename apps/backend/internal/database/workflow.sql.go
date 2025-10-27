@@ -14,20 +14,22 @@ import (
 )
 
 const createWorkflow = `-- name: CreateWorkflow :one
-INSERT INTO workflow (id, user_id, nodes, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) RETURNING id, user_id, nodes, created_at, updated_at
+INSERT INTO workflow (id, workflow_name, user_id, nodes, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, workflow_name, user_id, nodes, created_at, updated_at
 `
 
 type CreateWorkflowParams struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	Nodes     json.RawMessage
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           uuid.UUID
+	WorkflowName string
+	UserID       uuid.UUID
+	Nodes        json.RawMessage
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) (Workflow, error) {
 	row := q.db.QueryRowContext(ctx, createWorkflow,
 		arg.ID,
+		arg.WorkflowName,
 		arg.UserID,
 		arg.Nodes,
 		arg.CreatedAt,
@@ -36,6 +38,7 @@ func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) 
 	var i Workflow
 	err := row.Scan(
 		&i.ID,
+		&i.WorkflowName,
 		&i.UserID,
 		&i.Nodes,
 		&i.CreatedAt,
@@ -45,7 +48,7 @@ func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) 
 }
 
 const getWorkflowById = `-- name: GetWorkflowById :one
-SELECT id, user_id, nodes, created_at, updated_at FROM workflow WHERE id = $1
+SELECT id, workflow_name, user_id, nodes, created_at, updated_at FROM workflow WHERE id = $1
 `
 
 func (q *Queries) GetWorkflowById(ctx context.Context, id uuid.UUID) (Workflow, error) {
@@ -53,6 +56,7 @@ func (q *Queries) GetWorkflowById(ctx context.Context, id uuid.UUID) (Workflow, 
 	var i Workflow
 	err := row.Scan(
 		&i.ID,
+		&i.WorkflowName,
 		&i.UserID,
 		&i.Nodes,
 		&i.CreatedAt,
@@ -62,7 +66,7 @@ func (q *Queries) GetWorkflowById(ctx context.Context, id uuid.UUID) (Workflow, 
 }
 
 const getWorkflowsByUserId = `-- name: GetWorkflowsByUserId :many
-SELECT id, user_id, nodes, created_at, updated_at FROM workflow WHERE user_id = $1
+SELECT id, workflow_name, user_id, nodes, created_at, updated_at FROM workflow WHERE user_id = $1
 `
 
 func (q *Queries) GetWorkflowsByUserId(ctx context.Context, userID uuid.UUID) ([]Workflow, error) {
@@ -76,6 +80,7 @@ func (q *Queries) GetWorkflowsByUserId(ctx context.Context, userID uuid.UUID) ([
 		var i Workflow
 		if err := rows.Scan(
 			&i.ID,
+			&i.WorkflowName,
 			&i.UserID,
 			&i.Nodes,
 			&i.CreatedAt,
@@ -95,20 +100,27 @@ func (q *Queries) GetWorkflowsByUserId(ctx context.Context, userID uuid.UUID) ([
 }
 
 const updateWorkflowById = `-- name: UpdateWorkflowById :one
-UPDATE workflow SET nodes = $1, updated_at = $2 WHERE id = $3 RETURNING id, user_id, nodes, created_at, updated_at
+UPDATE workflow SET nodes = $1, workflow_name = $2, updated_at = $3 WHERE id = $4 RETURNING id, workflow_name, user_id, nodes, created_at, updated_at
 `
 
 type UpdateWorkflowByIdParams struct {
-	Nodes     json.RawMessage
-	UpdatedAt time.Time
-	ID        uuid.UUID
+	Nodes        json.RawMessage
+	WorkflowName string
+	UpdatedAt    time.Time
+	ID           uuid.UUID
 }
 
 func (q *Queries) UpdateWorkflowById(ctx context.Context, arg UpdateWorkflowByIdParams) (Workflow, error) {
-	row := q.db.QueryRowContext(ctx, updateWorkflowById, arg.Nodes, arg.UpdatedAt, arg.ID)
+	row := q.db.QueryRowContext(ctx, updateWorkflowById,
+		arg.Nodes,
+		arg.WorkflowName,
+		arg.UpdatedAt,
+		arg.ID,
+	)
 	var i Workflow
 	err := row.Scan(
 		&i.ID,
+		&i.WorkflowName,
 		&i.UserID,
 		&i.Nodes,
 		&i.CreatedAt,

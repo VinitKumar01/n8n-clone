@@ -44,7 +44,7 @@ func (db Db) HandlerGetUserById(w http.ResponseWriter, r *http.Request) {
 	idString := chi.URLParam(r, "userId")
 	id, err := uuid.Parse(idString)
 	if err != nil {
-		utils.RespondWithError(w, 400, fmt.Sprintf("Invalid feed follow id: %v", err))
+		utils.RespondWithError(w, 400, fmt.Sprintf("Invalid user id: %v", err))
 		return
 	}
 
