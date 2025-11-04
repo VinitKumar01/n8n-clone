@@ -25,8 +25,14 @@ export default function Flow() {
     {
       id: "2",
       type: "showOutput",
-      position: { x: 400, y: 100 },
+      position: { x: 800, y: 200 },
       data: { received: {} },
+    },
+    {
+      id: "3",
+      type: "geminiNode",
+      position: { x: 400, y: 100 },
+      data: {},
     },
   ]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -53,7 +59,7 @@ export default function Flow() {
   );
 
   const nodesWithHandlers = nodes.map((n) =>
-    n.type === "triggerManually"
+    n.type === "triggerManually" || "geminiNode"
       ? { ...n, data: { ...n.data, onSend: handleSend } }
       : n,
   );

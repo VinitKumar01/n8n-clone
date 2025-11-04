@@ -58,7 +58,7 @@ func main() {
 	v1Router.Get("/users/{userId}", db.HandlerGetUserById)
 	v1Router.Post("/workflow", db.HandlerCreateWorkflow)
 	v1Router.Get("/workflow/{workflowId}", db.HandlerGetWorkflowById)
-	v1Router.Get("/nodes/gemini", routes.HandlerGemini)
+	v1Router.Post("/nodes/gemini", routes.HandlerGemini)
 
 	router.Mount("/v1", v1Router)
 
