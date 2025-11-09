@@ -10,6 +10,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/sqlc-dev/sqlc v1.30.0
+	github.com/svix/svix-webhooks v1.81.0
 	google.golang.org/genai v1.32.0
 )
 

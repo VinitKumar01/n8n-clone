@@ -54,11 +54,11 @@ func main() {
 
 	v1Router := chi.NewRouter()
 	v1Router.Get("/health", routes.HandlerReadiness)
-	v1Router.Post("/users", db.HandlerCreateUser)
 	v1Router.Get("/users/{userId}", db.HandlerGetUserById)
 	v1Router.Post("/workflow", db.HandlerCreateWorkflow)
 	v1Router.Get("/workflow/{workflowId}", db.HandlerGetWorkflowById)
 	v1Router.Post("/nodes/gemini", routes.HandlerGemini)
+	v1Router.Post("/clerk/webhook", db.HandlerClerkWebhook)
 
 	router.Mount("/v1", v1Router)
 

@@ -10,7 +10,8 @@ import (
 
 type user struct {
 	ID         uuid.UUID `json:"id"`
-	Username   string    `json:"username"`
+	ClerkID    string    `json:"clerk_id"`
+	Email      string    `json:"email"`
 	Created_at time.Time `json:"created_at"`
 	Updated_at time.Time `json:"updated_at"`
 }
@@ -27,7 +28,8 @@ type workflow struct {
 func DatabaseUserToUser(dbUser database.User) user {
 	return user{
 		ID:         dbUser.ID,
-		Username:   dbUser.Username,
+		ClerkID:    dbUser.ClerkID,
+		Email:      dbUser.Email,
 		Created_at: dbUser.CreatedAt,
 		Updated_at: dbUser.UpdatedAt,
 	}
