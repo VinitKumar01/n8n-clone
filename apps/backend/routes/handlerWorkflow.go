@@ -14,9 +14,11 @@ import (
 
 func (db Db) HandlerCreateWorkflow(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		WorkflowName string          `json:"workflow_name"`
-		UserId       uuid.UUID       `json:"user_id"`
-		Nodes        json.RawMessage `json:"nodes"`
+		WorkflowName string               `json:"workflow_name"`
+		UserId       string               `json:"user_id"`
+		Nodes        json.RawMessage      `json:"nodes"`
+		Edges        json.RawMessage      `json:"edges"`
+		Status       utils.WorkflowStatus `json:"status"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -32,6 +34,8 @@ func (db Db) HandlerCreateWorkflow(w http.ResponseWriter, r *http.Request) {
 		ID:           uuid.New(),
 		WorkflowName: params.WorkflowName,
 		Nodes:        params.Nodes,
+		Edges:        params.Edges,
+		Status:       database.WorkflowStatus(params.Status),
 		UserID:       params.UserId,
 		CreatedAt:    time.Now().UTC(),
 		UpdatedAt:    time.Now().UTC(),

@@ -1,9 +1,5 @@
-import NodesBar from "@/components/NodesBar";
+import Worksapce from "@/components/Workspace";
 
 export default function Home() {
-  return (
-    <div className="h-screen flex justify-start w-full">
-      <NodesBar />
-    </div>
-  );
+  return <Worksapce />;
 }

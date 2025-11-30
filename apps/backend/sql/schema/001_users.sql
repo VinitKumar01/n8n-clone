@@ -2,7 +2,7 @@
 
 CREATE TABLE users (
     id UUID PRIMARY KEY,
-    clerk_id TEXT NOT NULL,
+    clerk_id TEXT NOT NULL UNIQUE,
     email TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL

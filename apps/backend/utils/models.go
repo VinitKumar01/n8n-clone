@@ -16,11 +16,20 @@ type user struct {
 	Updated_at time.Time `json:"updated_at"`
 }
 
+type WorkflowStatus string
+
+const (
+	WorkflowStatusActive    WorkflowStatus = "active"
+	WorkflowStatusNotActive WorkflowStatus = "not-active"
+)
+
 type workflow struct {
 	ID           uuid.UUID       `json:"id"`
-	UserID       uuid.UUID       `json:"user_id"`
+	UserID       string          `json:"user_id"`
 	WorkflowName string          `json:"workflow_name"`
 	Nodes        json.RawMessage `json:"nodes"`
+	Edges        json.RawMessage `json:"edges"`
+	Status       WorkflowStatus  `json:"status"`
 	Created_at   time.Time       `json:"created_at"`
 	Updated_at   time.Time       `json:"updated_at"`
 }
@@ -41,6 +50,8 @@ func DatabaseWorkflowToWorkflow(dbWorkflow database.Workflow) workflow {
 		UserID:       dbWorkflow.UserID,
 		WorkflowName: dbWorkflow.WorkflowName,
 		Nodes:        dbWorkflow.Nodes,
+		Edges:        dbWorkflow.Edges,
+		Status:       WorkflowStatus(dbWorkflow.Status),
 		Created_at:   dbWorkflow.CreatedAt,
 		Updated_at:   dbWorkflow.UpdatedAt,
 	}

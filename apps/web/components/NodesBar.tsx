@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "./ui/sidebar";
 import {
-  IconArrowLeft,
   IconBrandTabler,
   IconSettings,
   IconUserBolt,
@@ -18,14 +17,13 @@ import {
   useUser,
 } from "@clerk/nextjs";
 import { ModeToggle } from "./modeToggle";
-import Worksapce from "./Workspace";
 
-export default function NodesBar() {
+export default function NodesBar(props: { children?: React.ReactNode }) {
   const { isLoaded, isSignedIn, user } = useUser();
   const links = [
     {
       label: "Dashboard",
-      href: "#",
+      href: "/dashboard",
       icon: (
         <IconBrandTabler className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
@@ -42,13 +40,6 @@ export default function NodesBar() {
       href: "#",
       icon: (
         <IconSettings className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
-      ),
-    },
-    {
-      label: "Logout",
-      href: "#",
-      icon: (
-        <IconArrowLeft className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
     },
   ];
@@ -93,7 +84,7 @@ export default function NodesBar() {
           </div>
         </SidebarBody>
       </Sidebar>
-      <Worksapce />
+      {props.children}
     </div>
   );
 }

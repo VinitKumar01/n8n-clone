@@ -4,6 +4,7 @@ import "reactflow/dist/style.css";
 import "./globals.css";
 import { ThemeProvider } from "../components/theme-provider";
 import { ClerkProvider } from "@clerk/nextjs";
+import NodesBar from "@/components/NodesBar";
 
 const crimson = Crimson_Text({
   subsets: ["latin"],
@@ -31,7 +32,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <div className="h-screen flex justify-start w-full">
+              <NodesBar> {children}</NodesBar>
+            </div>
           </ThemeProvider>
         </body>
       </html>

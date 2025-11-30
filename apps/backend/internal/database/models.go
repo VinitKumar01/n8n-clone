@@ -5,11 +5,55 @@
 package database
 
 import (
+	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type WorkflowStatus string
+
+const (
+	WorkflowStatusActive    WorkflowStatus = "active"
+	WorkflowStatusNotActive WorkflowStatus = "not-active"
+)
+
+func (e *WorkflowStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = WorkflowStatus(s)
+	case string:
+		*e = WorkflowStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for WorkflowStatus: %T", src)
+	}
+	return nil
+}
+
+type NullWorkflowStatus struct {
+	WorkflowStatus WorkflowStatus
+	Valid          bool // Valid is true if WorkflowStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullWorkflowStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.WorkflowStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.WorkflowStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullWorkflowStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.WorkflowStatus), nil
+}
 
 type User struct {
 	ID        uuid.UUID
@@ -22,8 +66,10 @@ type User struct {
 type Workflow struct {
 	ID           uuid.UUID
 	WorkflowName string
-	UserID       uuid.UUID
+	UserID       string
 	Nodes        json.RawMessage
+	Edges        json.RawMessage
+	Status       WorkflowStatus
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
