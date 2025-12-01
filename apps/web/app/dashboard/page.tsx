@@ -1,19 +1,36 @@
-import { Separator } from "@/components/ui/separator";
-import { Circle } from "lucide-react";
+"use client";
 
-type Workflows = {
-  title: string;
+import { Separator } from "@/components/ui/separator";
+import { getWorkflows } from "@/lib/utils";
+import { useUser } from "@clerk/nextjs";
+import { Circle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
+
+type Workflow = {
   id: string;
-  state: "active" | "not-active";
+  workflow_name: string;
+  nodes: string;
+  edges: string;
+  status: "active" | "not-active";
+  user_id: string;
 };
 
 export default function DashboardPage() {
-  const workflows: Workflows[] = [
-    { title: "Workflow 1", id: "u2iu242ui", state: "active" },
-    { title: "Workflow 2", id: "u2iu242ui", state: "not-active" },
-    { title: "Workflow 3", id: "u2iu242ui", state: "active" },
-    { title: "Workflow 4", id: "u2iu242ui", state: "not-active" },
-  ];
+  const { user } = useUser();
+  const router = useRouter();
+
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+
+  useEffect(() => {
+    const fetchWorkflows = async () => {
+      const workflows = await getWorkflows(user?.id as string);
+      setWorkflows(workflows);
+    };
+
+    if (user?.id) fetchWorkflows();
+  }, [user?.id]);
+
   return (
     <div className="w-full h-full bg-black">
       <div className="bg-[#262626] max-w-full h-fit m-8 rounded-md">
@@ -26,11 +43,19 @@ export default function DashboardPage() {
           <div className="mx-6 grid grid-cols-3">
             {workflows.map((workflow, id) => {
               return (
-                <div key={id} className="mx-2 my-4 space-y-2 cursor-pointer">
-                  <div className="text-xl font-semibold">{workflow.title}</div>
+                <div
+                  key={id}
+                  className="mx-2 my-4 space-y-2 cursor-pointer"
+                  onClick={() => {
+                    router.push(`/workflow/${workflow.id}`);
+                  }}
+                >
+                  <div className="text-xl font-semibold">
+                    {workflow.workflow_name}
+                  </div>
                   <div className="text-muted-foreground">id: {workflow.id}</div>
                   <div className="flex items-center rounded-md gap-2">
-                    {workflow.state === "active" ? (
+                    {workflow.status === "active" ? (
                       <Circle
                         className="bg-transparent fill-green-500 stroke-green-500"
                         size={10}
@@ -41,7 +66,7 @@ export default function DashboardPage() {
                         size={10}
                       />
                     )}
-                    <div>{workflow.state}</div>
+                    <div>{workflow.status}</div>
                   </div>
                   <Separator />
                 </div>

@@ -110,7 +110,7 @@ func (q *Queries) GetWorkflowsByUserId(ctx context.Context, userID string) ([]Wo
 }
 
 const updateWorkflowById = `-- name: UpdateWorkflowById :one
-UPDATE workflow SET nodes = $1, edges = $2, workflow_name = $3, status = $4, updated_at = $5 WHERE id = $6 RETURNING id, workflow_name, user_id, nodes, edges, status, created_at, updated_at
+UPDATE workflow SET nodes = $1, edges = $2, workflow_name = $3, status = $4, updated_at = $5 WHERE id = $6 AND user_id = $7 RETURNING id, workflow_name, user_id, nodes, edges, status, created_at, updated_at
 `
 
 type UpdateWorkflowByIdParams struct {
@@ -120,6 +120,7 @@ type UpdateWorkflowByIdParams struct {
 	Status       WorkflowStatus
 	UpdatedAt    time.Time
 	ID           uuid.UUID
+	UserID       string
 }
 
 func (q *Queries) UpdateWorkflowById(ctx context.Context, arg UpdateWorkflowByIdParams) (Workflow, error) {
@@ -130,6 +131,7 @@ func (q *Queries) UpdateWorkflowById(ctx context.Context, arg UpdateWorkflowById
 		arg.Status,
 		arg.UpdatedAt,
 		arg.ID,
+		arg.UserID,
 	)
 	var i Workflow
 	err := row.Scan(

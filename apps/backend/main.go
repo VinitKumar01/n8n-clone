@@ -56,7 +56,9 @@ func main() {
 	v1Router.Get("/health", routes.HandlerReadiness)
 	v1Router.Get("/users/{userId}", db.HandlerGetUserById)
 	v1Router.Post("/workflow", db.HandlerCreateWorkflow)
+	v1Router.Put("/workflow", db.HandlerUpdateWorkflow)
 	v1Router.Get("/workflow/{workflowId}", db.HandlerGetWorkflowById)
+	v1Router.Get("/workflows/{userId}", db.HandlerGetWorkflowsByUserId)
 	v1Router.Post("/nodes/gemini", routes.HandlerGemini)
 	v1Router.Post("/clerk/webhook", db.HandlerClerkWebhook)
 

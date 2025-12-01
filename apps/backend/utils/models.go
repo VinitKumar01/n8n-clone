@@ -56,3 +56,11 @@ func DatabaseWorkflowToWorkflow(dbWorkflow database.Workflow) workflow {
 		Updated_at:   dbWorkflow.UpdatedAt,
 	}
 }
+
+func DatabaseWorkflowsToWorkflows(dbWorkflows []database.Workflow) []workflow {
+	workflows := []workflow{}
+	for _, dbWorkflow := range dbWorkflows {
+		workflows = append(workflows, DatabaseWorkflowToWorkflow(dbWorkflow))
+	}
+	return workflows
+}

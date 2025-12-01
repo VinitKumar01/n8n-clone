@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -10,38 +10,42 @@ import ReactFlow, {
   useNodesState,
   Connection,
   Edge,
+  Node,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { nodeTypes } from "./nodes/Nodes";
 import { Button } from "./ui/button";
 import { Circle } from "lucide-react";
-import axios from "axios";
-import { useUser } from "@clerk/nextjs";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL!;
-
-export default function Flow() {
-  const { user } = useUser();
+export default function Flow({
+  saveAction,
+  nds,
+  egs,
+}: {
+  saveAction: (nodes: Node[], edges: Edge[], status: boolean) => void;
+  nds?: Node[];
+  egs?: Edge[];
+}) {
   const [status, setStatus] = useState<boolean>(false);
   const [nodes, setNodes, onNodesChange] = useNodesState([
-    {
-      id: "1",
-      type: "triggerManually",
-      position: { x: 100, y: 100 },
-      data: {},
-    },
-    {
-      id: "2",
-      type: "showOutput",
-      position: { x: 800, y: 200 },
-      data: { received: {} },
-    },
-    {
-      id: "3",
-      type: "geminiNode",
-      position: { x: 400, y: 100 },
-      data: {},
-    },
+    // {
+    //   id: "1",
+    //   type: "triggerManually",
+    //   position: { x: 100, y: 100 },
+    //   data: {},
+    // },
+    // {
+    //   id: "2",
+    //   type: "showOutput",
+    //   position: { x: 800, y: 200 },
+    //   data: {},
+    // },
+    // {
+    //   id: "3",
+    //   type: "geminiNode",
+    //   position: { x: 400, y: 100 },
+    //   data: {},
+    // },
   ]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
@@ -72,6 +76,15 @@ export default function Flow() {
       : n,
   );
 
+  useEffect(() => {
+    if (nds && nodes.length === 0) {
+      setNodes(nds);
+    }
+    if (egs && edges.length === 0) {
+      setEdges(egs);
+    }
+  }, [nds, egs, setEdges, setNodes, nodes.length, edges.length]);
+
   return (
     <div className="w-full h-full">
       <div className="bg-[#262626] rounded-md flex justify-between gap-4 items-center py-2 absolute z-10">
@@ -92,13 +105,7 @@ export default function Flow() {
         <div className="gap-4 flex justify-end px-2">
           <Button
             onClick={() => {
-              axios.post(BACKEND_URL + "/workflow", {
-                workflow_name: "test",
-                user_id: user?.id,
-                nodes: JSON.stringify(nodes),
-                edges: JSON.stringify(edges),
-                status: status ? "active" : "not-active",
-              });
+              saveAction(nodes, edges, status);
             }}
           >
             Save

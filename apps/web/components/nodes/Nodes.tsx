@@ -212,7 +212,7 @@ function GeminiNode({
   );
 }
 
-function ShowOutput({ data }: { data: { received: JSON } }) {
+function ShowOutput({ data }: { data: { received?: JSON } }) {
   return (
     <div className="p-2 border rounded-2xl bg-[#262626]">
       <div>Show Output</div>

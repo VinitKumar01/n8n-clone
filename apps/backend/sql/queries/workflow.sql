@@ -8,4 +8,4 @@ SELECT * FROM workflow WHERE user_id = $1;
 SELECT * FROM workflow WHERE id = $1;
 
 -- name: UpdateWorkflowById :one
-UPDATE workflow SET nodes = $1, edges = $2, workflow_name = $3, status = $4, updated_at = $5 WHERE id = $6 RETURNING *;
+UPDATE workflow SET nodes = $1, edges = $2, workflow_name = $3, status = $4, updated_at = $5 WHERE id = $6 AND user_id = $7 RETURNING *;
