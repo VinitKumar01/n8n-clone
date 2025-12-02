@@ -21,10 +21,12 @@ export default function Flow({
   saveAction,
   nds,
   egs,
+  sts,
 }: {
   saveAction: (nodes: Node[], edges: Edge[], status: boolean) => void;
   nds?: Node[];
   egs?: Edge[];
+  sts?: boolean;
 }) {
   const [status, setStatus] = useState<boolean>(false);
   const [nodes, setNodes, onNodesChange] = useNodesState([
@@ -83,7 +85,19 @@ export default function Flow({
     if (egs && edges.length === 0) {
       setEdges(egs);
     }
-  }, [nds, egs, setEdges, setNodes, nodes.length, edges.length]);
+    if (sts) {
+      setStatus(sts);
+    }
+  }, [
+    nds,
+    egs,
+    sts,
+    setStatus,
+    setEdges,
+    setNodes,
+    nodes.length,
+    edges.length,
+  ]);
 
   return (
     <div className="w-full h-full">
@@ -105,7 +119,7 @@ export default function Flow({
         <div className="gap-4 flex justify-end px-2">
           <Button
             onClick={() => {
-              saveAction(nodes, edges, status);
+              saveAction(nodesWithHandlers, edges, status);
             }}
           >
             Save

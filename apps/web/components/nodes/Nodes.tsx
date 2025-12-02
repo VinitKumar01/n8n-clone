@@ -95,6 +95,7 @@ function GeminiNode({
 }: {
   id: string;
   data: {
+    inputs?: { apiKey: string; model: string; prompt: string };
     onSend: (id: string, payload: string) => void;
     received: {
       proceed: boolean;
@@ -103,9 +104,9 @@ function GeminiNode({
 }) {
   const promptRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
-  const [prompt, setPrompt] = useState(promptRef.current?.value);
-  const [apiKey, setApiKey] = useState(promptRef.current?.value);
-  const [model, setModel] = useState("gemini-2.5-flash");
+  const [prompt, setPrompt] = useState(data.inputs?.prompt);
+  const [apiKey, setApiKey] = useState(data.inputs?.apiKey);
+  const [model, setModel] = useState(data.inputs?.model || "gemini-2.5-flash");
 
   const askGemini = useCallback(async () => {
     const myHeaders = new Headers();
@@ -126,9 +127,22 @@ function GeminiNode({
   }, [apiKey, prompt, model, id]);
 
   const onSendRef = useRef(data.onSend);
+
   useEffect(() => {
     onSendRef.current = data.onSend;
   }, [data.onSend]);
+
+  useEffect(() => {
+    if (apiKey && model && prompt) {
+      data.inputs = { apiKey, model, prompt };
+    }
+  }, [apiKey, prompt, model, data]);
+
+  useEffect(() => {
+    if (data.inputs) {
+      console.log(data.inputs);
+    }
+  }, [data.inputs]);
 
   useEffect(() => {
     if (data.received?.proceed === true) {

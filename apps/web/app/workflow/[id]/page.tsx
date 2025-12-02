@@ -9,15 +9,6 @@ import { Edge, Node } from "reactflow";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL!;
 
-type Workflow = {
-  id: string;
-  workflow_name: string;
-  nodes: string;
-  edges: string;
-  status: "active" | "not-active";
-  user_id: string;
-};
-
 export default function MyWorkflowsPage({
   params,
 }: {
@@ -27,6 +18,7 @@ export default function MyWorkflowsPage({
   const { id } = React.use(params);
   const [nodes, setNodes] = useState<Node[]>();
   const [edges, setEdges] = useState<Edge[]>();
+  const [status, setStatus] = useState<boolean>();
 
   const saveAction = (nodes: Node[], edges: Edge[], status: boolean) => {
     axios.put(BACKEND_URL + "/workflow", {
@@ -47,11 +39,20 @@ export default function MyWorkflowsPage({
         setNodes(nodes);
         const edges = JSON.parse(workflow.edges);
         setEdges(edges);
+        const status = workflow.status == "active" ? true : false;
+        setStatus(status);
       }
     };
 
     if (id) fetchWorkflow();
   }, [id]);
 
-  return <Worksapce saveAction={saveAction} nodes={nodes} edges={edges} />;
+  return (
+    <Worksapce
+      saveAction={saveAction}
+      nodes={nodes}
+      edges={edges}
+      status={status}
+    />
+  );
 }
