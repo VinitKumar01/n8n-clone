@@ -16,6 +16,7 @@ import "reactflow/dist/style.css";
 import { nodeTypes } from "./nodes/Nodes";
 import { Button } from "./ui/button";
 import { Circle } from "lucide-react";
+import ToolBar from "./ToolBar";
 
 export default function Flow({
   saveAction,
@@ -145,6 +146,24 @@ export default function Flow({
         <MiniMap />
         <Controls />
         <Background />
+        <ToolBar
+          setNodesAction={(nd) => {
+            setNodes((prev) => {
+              const last = prev[prev.length - 1];
+              return [
+                ...prev,
+                {
+                  ...nd,
+                  id: last ? `${parseInt(last.id) + 1}` : "1",
+                  position: {
+                    x: last ? last.position.x + 10 : 100,
+                    y: last ? last.position.y + 10 : 100,
+                  },
+                },
+              ];
+            });
+          }}
+        />
       </ReactFlow>
     </div>
   );

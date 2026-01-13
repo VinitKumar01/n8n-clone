@@ -244,3 +244,46 @@ export const nodeTypes = {
   geminiNode: GeminiNode,
   showOutput: ShowOutput,
 };
+
+export const nodes = [
+  {
+    name: "Gemini",
+    type: "geminiNode",
+    component: () => {
+      return (
+        <div className="h-full bg-[#262626] p-4 rounded-2xl flex justify-center items-center">
+          <Image
+            src={"gemini-color.svg"}
+            alt="Gemini"
+            width={50}
+            height={50}
+            className="cursor-pointer"
+          />
+        </div>
+      );
+    },
+  },
+  {
+    name: "Output",
+    type: "showOutput",
+    component: () => {
+      return (
+        <div className="p-4 h-full flex justify-center items-center border rounded-2xl bg-[#262626]">
+          <div className="font-semibold">Output</div>
+        </div>
+      );
+    },
+  },
+  {
+    name: "Manual",
+    type: "triggerManually",
+    component: () => {
+      return (
+        <div className="h-full border p-4 bg-[#262626] rounded-2xl cursor-pointer">
+          <IconPointer size={35} />
+          <pre className="font-semibold">Click</pre>
+        </div>
+      );
+    },
+  },
+];
