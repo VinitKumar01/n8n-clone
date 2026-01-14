@@ -14,6 +14,7 @@ import (
 
 func (db Db) HandlerCreateWorkflow(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
+		ID           uuid.UUID            `json:"id"`
 		WorkflowName string               `json:"workflow_name"`
 		UserId       string               `json:"user_id"`
 		Nodes        json.RawMessage      `json:"nodes"`
@@ -30,8 +31,12 @@ func (db Db) HandlerCreateWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if params.ID == uuid.Nil {
+		params.ID = uuid.New()
+	}
+
 	workflow, err := db.Queries.CreateWorkflow(r.Context(), database.CreateWorkflowParams{
-		ID:           uuid.New(),
+		ID:           params.ID,
 		WorkflowName: params.WorkflowName,
 		Nodes:        params.Nodes,
 		Edges:        params.Edges,

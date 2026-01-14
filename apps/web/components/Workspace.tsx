@@ -11,7 +11,13 @@ export default function Worksapce({
   edges,
   status,
 }: {
-  saveAction: (nodes: Node[], edges: Edge[], status: boolean) => void;
+  saveAction: (
+    nodes: Node[],
+    edges: Edge[],
+    status: boolean,
+    id?: string,
+  ) => void;
+  id?: string;
   nodes?: Node[];
   edges?: Edge[];
   status?: boolean;

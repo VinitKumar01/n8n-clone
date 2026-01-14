@@ -10,8 +10,14 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL!;
 export default function Home() {
   const { user } = useUser();
 
-  const saveAction = (nodes: Node[], edges: Edge[], status: boolean) => {
+  const saveAction = (
+    nodes: Node[],
+    edges: Edge[],
+    status: boolean,
+    id?: string,
+  ) => {
     axios.post(BACKEND_URL + "/workflow", {
+      id: id,
       workflow_name: "test",
       user_id: user?.id,
       nodes: JSON.stringify(nodes),

@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Button } from "../ui/button";
+import { WebhookIcon } from "lucide-react";
 
 // type NodeData = {
 //   a: number;
@@ -112,16 +113,19 @@ function GeminiNode({
     const myHeaders = new Headers();
     myHeaders.append("Content-Type", "application/json");
 
-    const response = await fetch("http://localhost:8080/v1/nodes/gemini", {
-      method: "POST",
-      headers: myHeaders,
-      body: JSON.stringify({
-        prompt: prompt,
-        apiKey: apiKey,
-        model: model,
-      }),
-      redirect: "follow",
-    });
+    const response = await fetch(
+      process.env.NEXT_PUBLIC_BACKEND_URL + "/nodes/gemini",
+      {
+        method: "POST",
+        headers: myHeaders,
+        body: JSON.stringify({
+          prompt: prompt,
+          apiKey: apiKey,
+          model: model,
+        }),
+        redirect: "follow",
+      },
+    );
     const result = (await response.json()).result;
     onSendRef.current?.(id, result);
   }, [apiKey, prompt, model, id]);
@@ -238,11 +242,77 @@ function ShowOutput({ data }: { data: { received?: JSON } }) {
   );
 }
 
+function WebhookNode({
+  data,
+}: {
+  data: {
+    inputs?: { path: string };
+  };
+}) {
+  const pathRef = useRef<HTMLInputElement>(null);
+  const [url, setUrl] = useState<string>();
+  const [path, setPath] = useState(data.inputs?.path);
+
+  useEffect(() => {
+    if (path) {
+      data.inputs = { path };
+    }
+  }, [path, data]);
+
+  useEffect(() => {
+    if (!url) {
+      setUrl(
+        process.env.NEXT_PUBLIC_BACKEND_URL + "/" + crypto.randomUUID() + "/",
+      );
+    }
+  }, [url]);
+
+  return (
+    <div className="bg-[#262626] p-4 rounded-2xl">
+      <Dialog>
+        <DialogTrigger>
+          <WebhookIcon />
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Webhook Node options</DialogTitle>
+            <DialogTrigger className="flex justify-start">
+              <pre className="text-start text-wrap break-all">
+                {`Your final url will be "${url} + Path"`}
+              </pre>
+            </DialogTrigger>
+            <DialogDescription>
+              This node will only work when the worlflow is Saved and Activated.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col justify-center items-center gap-4 p-4 rounded-2xl">
+            <input
+              ref={pathRef}
+              placeholder="Path"
+              className="border border-dashed border-white rounded-md p-2"
+              defaultValue={path}
+            />
+            <Button
+              onClick={() => {
+                setPath(pathRef.current?.value as string);
+              }}
+            >
+              Save values
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+
 export const nodeTypes = {
   // textUpdater: TextUpdaterNode,
   triggerManually: TriggerManually,
   geminiNode: GeminiNode,
   showOutput: ShowOutput,
+  webhookNode: WebhookNode,
 };
 
 export const nodes = [
@@ -270,6 +340,17 @@ export const nodes = [
       return (
         <div className="p-4 h-full flex justify-center items-center border rounded-2xl bg-[#262626]">
           <div className="font-semibold">Output</div>
+        </div>
+      );
+    },
+  },
+  {
+    name: "Webhook",
+    type: "webhookNode",
+    component: () => {
+      return (
+        <div className="h-full w-full bg-[#262626] p-4 rounded-2xl flex justify-center items-center">
+          <WebhookIcon />
         </div>
       );
     },
