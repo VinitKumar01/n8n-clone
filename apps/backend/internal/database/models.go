@@ -73,3 +73,12 @@ type Workflow struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
+
+type WorkflowMetadatum struct {
+	WorkflowID uuid.UUID
+	Edges      json.RawMessage
+	InDegree   json.RawMessage
+	StartNodes json.RawMessage
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}

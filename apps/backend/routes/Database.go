@@ -1,7 +1,12 @@
 package routes
 
-import "github.com/vinitkumar01/n8n-clone/internal/database"
+import (
+	"database/sql"
+
+	"github.com/vinitkumar01/n8n-clone/internal/database"
+)
 
 type Db struct {
+	DB      *sql.DB
 	Queries *database.Queries
 }

@@ -146,3 +146,35 @@ func (q *Queries) UpdateWorkflowById(ctx context.Context, arg UpdateWorkflowById
 	)
 	return i, err
 }
+
+const updateWorkflowStatusById = `-- name: UpdateWorkflowStatusById :one
+UPDATE workflow SET status = $1, updated_at = $2 WHERE id = $3 AND user_id = $4 RETURNING id, workflow_name, user_id, nodes, edges, status, created_at, updated_at
+`
+
+type UpdateWorkflowStatusByIdParams struct {
+	Status    WorkflowStatus
+	UpdatedAt time.Time
+	ID        uuid.UUID
+	UserID    string
+}
+
+func (q *Queries) UpdateWorkflowStatusById(ctx context.Context, arg UpdateWorkflowStatusByIdParams) (Workflow, error) {
+	row := q.db.QueryRowContext(ctx, updateWorkflowStatusById,
+		arg.Status,
+		arg.UpdatedAt,
+		arg.ID,
+		arg.UserID,
+	)
+	var i Workflow
+	err := row.Scan(
+		&i.ID,
+		&i.WorkflowName,
+		&i.UserID,
+		&i.Nodes,
+		&i.Edges,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

@@ -38,6 +38,7 @@ func main() {
 
 	queries := database.New(conn)
 	db := routes.Db{
+		DB:      conn,
 		Queries: queries,
 	}
 

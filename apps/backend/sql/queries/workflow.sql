@@ -9,3 +9,6 @@ SELECT * FROM workflow WHERE id = $1;
 
 -- name: UpdateWorkflowById :one
 UPDATE workflow SET nodes = $1, edges = $2, workflow_name = $3, status = $4, updated_at = $5 WHERE id = $6 AND user_id = $7 RETURNING *;
+
+-- name: UpdateWorkflowStatusById :one
+UPDATE workflow SET status = $1, updated_at = $2 WHERE id = $3 AND user_id = $4 RETURNING *;
