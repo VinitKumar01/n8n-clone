@@ -1,20 +1,19 @@
-package nodes
+package utils
 
 import (
 	"context"
 
-	"github.com/vinitkumar01/n8n-clone/utils"
 	"google.golang.org/genai"
 )
 
 func GetGeminiResponse(ctx context.Context, args map[string]any, prevResult any) (any, error) {
-	prompt := utils.AnyToString(args["prompt"])
+	prompt := AnyToString(args["prompt"])
 	if prevResult != nil {
-		prev := utils.AnyToString(prevResult)
+		prev := AnyToString(prevResult)
 		prompt = prompt + "/n" + prev
 	}
-	apiKey := utils.AnyToString(args["apiKey"])
-	model := utils.AnyToString(args["model"])
+	apiKey := AnyToString(args["apiKey"])
+	model := AnyToString(args["model"])
 	return gemini(ctx, prompt, apiKey, model)
 }
 

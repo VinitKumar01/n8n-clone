@@ -6,8 +6,9 @@ import (
 )
 
 type Node struct {
-	ID   string `json:"id"`
-	Type string `json:"type"`
+	ID   string         `json:"id"`
+	Type string         `json:"type"`
+	Data map[string]any `json:"data"`
 }
 
 type Edge struct {

@@ -17,7 +17,11 @@ import (
 )
 
 func main() {
-	godotenv.Load("./.env")
+	err := godotenv.Load("./.env")
+	if err != nil {
+		fmt.Printf("Error while loading envs: %v", err)
+		return
+	}
 
 	port := os.Getenv("PORT")
 
@@ -60,7 +64,7 @@ func main() {
 	v1Router.Put("/workflow", db.HandlerUpdateWorkflow)
 	v1Router.Get("/workflow/{workflowId}", db.HandlerGetWorkflowById)
 	v1Router.Get("/workflows/{userId}", db.HandlerGetWorkflowsByUserId)
-	v1Router.Post("/nodes/gemini", routes.HandlerGemini)
+	v1Router.Post("/workflow/status", db.HandlerWorkflowStatus)
 	v1Router.Post("/clerk/webhook", db.HandlerClerkWebhook)
 
 	router.Mount("/v1", v1Router)
