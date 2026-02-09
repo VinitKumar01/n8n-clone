@@ -9,42 +9,60 @@ import (
 	"github.com/google/uuid"
 )
 
-type Callback func(context.Context, map[string]any) (any, error)
+type TriggerEvent struct {
+	WorkflowID    string
+	TriggerNodeID string
+	Input         map[string]any
+}
+
+type TriggerFn func(context.Context, TriggerEvent)
 
 type Scheduler struct {
 	mu   sync.Mutex
-	jobs map[string]chan bool
+	jobs map[string]chan struct{}
 }
 
 func NewScheduler() *Scheduler {
 	return &Scheduler{
-		jobs: make(map[string]chan bool),
+		jobs: make(map[string]chan struct{}),
 	}
 }
 
-func (s *Scheduler) Start(duration time.Duration, fn Callback, ctx context.Context, params map[string]any) string {
+func (s *Scheduler) StartSchedule(
+	ctx context.Context,
+	duration time.Duration,
+	event TriggerEvent,
+	trigger TriggerFn,
+) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	jobID := uuid.New().String()
-	done := make(chan bool)
-	s.jobs[jobID] = done
+	stop := make(chan struct{})
+	s.jobs[jobID] = stop
 
 	ticker := time.NewTicker(duration)
 
-	go func(id string, stop chan bool) {
+	go func(id string) {
 		defer ticker.Stop()
+
 		for {
 			select {
-			case <-stop:
-				fmt.Println("Stopped job:", id)
+			case <-ctx.Done():
+				fmt.Println("Scheduler context canceled:", id)
 				return
+
+			case <-stop:
+				fmt.Println("Stopped scheduled job:", id)
+				return
+
 			case t := <-ticker.C:
-				fn(ctx, params)
-				fmt.Println("Periodic job executed:", id, "at", t)
+				fmt.Println("Scheduler firing:", id, "at", t)
+
+				trigger(ctx, event)
 			}
 		}
-	}(jobID, done)
+	}(jobID)
 
 	return jobID
 }
@@ -53,8 +71,8 @@ func (s *Scheduler) Stop(jobID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if done, exists := s.jobs[jobID]; exists {
-		close(done)
+	if stop, ok := s.jobs[jobID]; ok {
+		close(stop)
 		delete(s.jobs, jobID)
 	}
 }
@@ -63,8 +81,8 @@ func (s *Scheduler) StopAll() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for id, done := range s.jobs {
-		close(done)
+	for id, stop := range s.jobs {
+		close(stop)
 		delete(s.jobs, id)
 	}
 }

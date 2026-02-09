@@ -2,43 +2,54 @@ package utils
 
 import (
 	"context"
+	"fmt"
+	"sync"
 )
 
-type TaskParams map[string]any
-
-type TaskFn func(context.Context, map[string]any, any) (any, error)
-
-type taskQueue struct {
-	taskFns    []TaskFn
-	taskParams []TaskParams
-	Results    map[int]any
+type TaskQueue struct {
+	jobs chan string
+	wg   sync.WaitGroup
 }
 
-func CreateTaskQueue() *taskQueue {
-	return &taskQueue{
-		taskFns:    make([]TaskFn, 0),
-		taskParams: make([]TaskParams, 0),
-		Results:    make(map[int]any),
+func NewTaskQueue(buffer int) *TaskQueue {
+	return &TaskQueue{
+		jobs: make(chan string, buffer),
 	}
 }
 
-func (q *taskQueue) EnqueueTask(taskFn TaskFn, params TaskParams) {
-	q.taskFns = append(q.taskFns, taskFn)
-	q.taskParams = append(q.taskParams, params)
+func (q *TaskQueue) StartWorkers(
+	ctx context.Context,
+	workerCount int,
+	execute func(context.Context, string) error,
+) {
+	for range workerCount {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+
+				case nodeID, ok := <-q.jobs:
+					if !ok {
+						return
+					}
+
+					if err := execute(ctx, nodeID); err != nil {
+						fmt.Println("node execution error:", err)
+					}
+
+					q.wg.Done()
+				}
+			}
+		}()
+	}
 }
 
-func (q *taskQueue) Execute(ctx context.Context) error {
-	for id, task := range q.taskFns {
-		var prevResult any
-		if id >= 1 {
-			prevResult = q.Results[id-1]
-		}
-		result, err := task(ctx, q.taskParams[id], prevResult)
-		if err != nil {
-			return err
-		}
-		q.Results[id] = result
-	}
+func (q *TaskQueue) Enqueue(nodeID string) {
+	q.wg.Add(1)
+	q.jobs <- nodeID
+}
 
-	return nil
+func (q *TaskQueue) Wait() {
+	q.wg.Wait()
 }
