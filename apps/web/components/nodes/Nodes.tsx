@@ -25,45 +25,7 @@ import {
 } from "../ui/select";
 import { Button } from "../ui/button";
 import { WebhookIcon } from "lucide-react";
-
-// type NodeData = {
-//   a: number;
-//   b: number;
-//   onChange?: (id: string, a: number, b: number) => void;
-// };
-//
-// function TextUpdaterNode({ id, data }: NodeProps<NodeData>) {
-//   const onChange = useCallback(
-//     (evt: ChangeEvent<HTMLInputElement>) => {
-//       const value = evt.target.value.trim();
-//       const [aStr, bStr] = value.split(",").map((v) => v.trim());
-//       const a = parseFloat(aStr);
-//       const b = parseFloat(bStr);
-//
-//       if (!isNaN(a) && !isNaN(b)) {
-//         data.onChange?.(id, a, b);
-//       }
-//     },
-//     [data, id],
-//   );
-//
-//   return (
-//     <div className="p-2 rounded-lg border bg-white shadow-md text-sm w-40">
-//       <label htmlFor={`text-${id}`} className="block text-gray-700 mb-1">
-//         A: {data.a}, B: {data.b}
-//       </label>
-//       <input
-//         id={`text-${id}`}
-//         name="text"
-//         onChange={onChange}
-//         placeholder="e.g. 5, 10"
-//         className="nodrag border rounded px-2 py-1 w-full"
-//       />
-//       <Handle type="target" position={Position.Top} />
-//       <Handle type="source" position={Position.Bottom} />
-//     </div>
-//   );
-// }
+import { useUser } from "@clerk/nextjs";
 
 function TriggerManually({
   id,
@@ -71,17 +33,63 @@ function TriggerManually({
 }: {
   id: string;
   data: {
-    onSend: (id: string, payload: { proceed: boolean }) => void;
+    onSend: (id: string, payload: any) => void;
+    workflowId?: string;
   };
 }) {
-  const handleClick = useCallback(() => {
-    data.onSend(id, { proceed: true });
-  }, [data, id]);
+  const workflowId = data.workflowId;
+  const { user } = useUser();
+
+  const executeNode = useCallback(async () => {
+    if (!workflowId) {
+      console.error("No workflowId provided to TriggerManually");
+      return;
+    }
+
+    try {
+      const myHeaders = new Headers();
+      myHeaders.append("Content-Type", "application/json");
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/workflow/${workflowId}/execute`,
+        {
+          method: "POST",
+          headers: myHeaders,
+          body: JSON.stringify({
+            startNode: id,
+            userId: user?.id,
+          }),
+          redirect: "follow",
+        },
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Failed to execute workflow:", response.status, text);
+        return;
+      }
+
+      const body = await response.json();
+      const results = body.results ?? {};
+
+      Object.entries(results).forEach(([nodeId, payload]) => {
+        try {
+          data.onSend(nodeId, payload);
+        } catch (e) {
+          console.error("onSend error for node", nodeId, e);
+        }
+      });
+    } catch (err) {
+      console.error("Error executing workflow:", err);
+    }
+  }, [id, data, workflowId, user?.id]);
 
   return (
     <div
       className="border p-4 bg-[#262626] rounded-2xl cursor-pointer"
-      onClick={handleClick}
+      onClick={executeNode}
+      role="button"
+      title="Run workflow from this node"
     >
       <IconPointer size={35} />
       <pre className="font-semibold">Click</pre>
@@ -91,69 +99,33 @@ function TriggerManually({
 }
 
 function GeminiNode({
-  id,
   data,
 }: {
   id: string;
   data: {
-    inputs?: { apiKey: string; model: string; prompt: string };
-    onSend: (id: string, payload: string) => void;
-    received: {
-      proceed: boolean;
-    };
+    inputs?: { apiKey?: string; model?: string; prompt?: string };
+    onSend?: (id: string, payload: any) => void;
+    received?: any;
   };
 }) {
   const promptRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
-  const [prompt, setPrompt] = useState(data.inputs?.prompt);
-  const [apiKey, setApiKey] = useState(data.inputs?.apiKey);
-  const [model, setModel] = useState(data.inputs?.model || "gemini-2.5-flash");
-
-  const askGemini = useCallback(async () => {
-    const myHeaders = new Headers();
-    myHeaders.append("Content-Type", "application/json");
-
-    const response = await fetch(
-      process.env.NEXT_PUBLIC_BACKEND_URL + "/nodes/gemini",
-      {
-        method: "POST",
-        headers: myHeaders,
-        body: JSON.stringify({
-          prompt: prompt,
-          apiKey: apiKey,
-          model: model,
-        }),
-        redirect: "follow",
-      },
-    );
-    const result = (await response.json()).result;
-    onSendRef.current?.(id, result);
-  }, [apiKey, prompt, model, id]);
-
-  const onSendRef = useRef(data.onSend);
+  const [prompt, setPrompt] = useState<string | undefined>(data.inputs?.prompt);
+  const [apiKey, setApiKey] = useState<string | undefined>(data.inputs?.apiKey);
+  const [model, setModel] = useState<string>(
+    data.inputs?.model || "gemini-2.5-flash",
+  );
+  const [output, setOutput] = useState<any>(data.received ?? null);
 
   useEffect(() => {
-    onSendRef.current = data.onSend;
-  }, [data.onSend]);
+    data.inputs = { apiKey, model, prompt };
+  }, [apiKey, model, prompt, data]);
 
   useEffect(() => {
-    if (apiKey && model && prompt) {
-      data.inputs = { apiKey, model, prompt };
+    if (data.received !== undefined) {
+      setOutput(data.received);
     }
-  }, [apiKey, prompt, model, data]);
-
-  useEffect(() => {
-    if (data.inputs) {
-      console.log(data.inputs);
-    }
-  }, [data.inputs]);
-
-  useEffect(() => {
-    if (data.received?.proceed === true) {
-      askGemini();
-      data.received.proceed = false;
-    }
-  }, [data.received, askGemini]);
+  }, [data.received]);
 
   return (
     <div className="bg-[#262626] p-4 rounded-2xl">
@@ -180,9 +152,11 @@ function GeminiNode({
               </Link>
             </DialogTrigger>
             <DialogDescription>
-              These options will be used when this node is trigerred
+              These options will be used when this node is triggered by the
+              workflow.
             </DialogDescription>
           </DialogHeader>
+
           <div className="flex flex-col justify-center items-center gap-4 p-4 rounded-2xl">
             <input
               ref={promptRef}
@@ -198,7 +172,7 @@ function GeminiNode({
             />
             <Select
               onValueChange={(value: string) => setModel(value)}
-              defaultValue="gemini-2.5-flash"
+              defaultValue={model}
             >
               <SelectTrigger className="w-[270px]">
                 <SelectValue placeholder="Models" />
@@ -224,18 +198,35 @@ function GeminiNode({
           </div>
         </DialogContent>
       </Dialog>
+
+      <div className="mt-2">
+        <div className="text-xs text-muted-foreground mb-2">
+          Configured prompt
+        </div>
+        <pre className="text-sm p-2 rounded bg-[#111111] break-words">
+          {prompt ?? "<not configured>"}
+        </pre>
+      </div>
+
+      <div className="mt-3">
+        <div className="text-xs text-muted-foreground mb-1">Output</div>
+        <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
+          {output ? JSON.stringify(output, null, 2) : "<no output yet>"}
+        </pre>
+      </div>
+
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
     </div>
   );
 }
 
-function ShowOutput({ data }: { data: { received?: JSON } }) {
+function ShowOutput({ data }: { data: { received?: any } }) {
   return (
     <div className="p-2 border rounded-2xl bg-[#262626]">
       <div>Show Output</div>
       <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
-        {JSON.stringify(data.received, null, 2) || ""}
+        {data.received ? JSON.stringify(data.received, null, 2) : ""}
       </pre>
       <Handle type="target" position={Position.Left} />
     </div>
@@ -244,28 +235,36 @@ function ShowOutput({ data }: { data: { received?: JSON } }) {
 
 function WebhookNode({
   data,
+  workflowId,
 }: {
   data: {
-    inputs?: { path: string };
+    inputs?: { path?: string };
   };
+  workflowId?: string;
 }) {
   const pathRef = useRef<HTMLInputElement>(null);
-  const [url, setUrl] = useState<string>();
-  const [path, setPath] = useState(data.inputs?.path);
+  const [path, setPath] = useState<string | undefined>(data.inputs?.path);
+  const [url, setUrl] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (path) {
-      data.inputs = { path };
-    }
+    data.inputs = { path };
   }, [path, data]);
 
   useEffect(() => {
-    if (!url) {
+    if (workflowId && path) {
       setUrl(
-        process.env.NEXT_PUBLIC_BACKEND_URL + "/" + crypto.randomUUID() + "/",
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/webhook/${workflowId}/${path}`,
+      );
+    } else if (path) {
+      setUrl(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/webhook/<workflowId>/${path}`,
+      );
+    } else {
+      setUrl(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/webhook/<workflowId>/<path>`,
       );
     }
-  }, [url]);
+  }, [path, workflowId]);
 
   return (
     <div className="bg-[#262626] p-4 rounded-2xl">
@@ -277,12 +276,10 @@ function WebhookNode({
           <DialogHeader>
             <DialogTitle>Webhook Node options</DialogTitle>
             <DialogTrigger className="flex justify-start">
-              <pre className="text-start text-wrap break-all">
-                {`Your final url will be "${url} + Path"`}
-              </pre>
+              <pre className="text-start text-wrap break-all">{`Your final url will be: ${url}`}</pre>
             </DialogTrigger>
             <DialogDescription>
-              This node will only work when the worlflow is Saved and Activated.
+              This node will only work when the workflow is Saved and Activated.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col justify-center items-center gap-4 p-4 rounded-2xl">
@@ -302,13 +299,20 @@ function WebhookNode({
           </div>
         </DialogContent>
       </Dialog>
+
+      <div className="mt-2">
+        <div className="text-xs text-muted-foreground mb-1">Webhook path</div>
+        <pre className="text-sm p-2 rounded bg-[#111111] break-words">
+          {path ?? "<not configured>"}
+        </pre>
+      </div>
+
       <Handle type="source" position={Position.Right} />
     </div>
   );
 }
 
 export const nodeTypes = {
-  // textUpdater: TextUpdaterNode,
   triggerManually: TriggerManually,
   geminiNode: GeminiNode,
   showOutput: ShowOutput,

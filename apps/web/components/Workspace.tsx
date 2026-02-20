@@ -10,6 +10,7 @@ export default function Worksapce({
   nodes,
   edges,
   status,
+  workflowId,
 }: {
   saveAction: (
     nodes: Node[],
@@ -21,11 +22,18 @@ export default function Worksapce({
   nodes?: Node[];
   edges?: Edge[];
   status?: boolean;
+  workflowId?: string;
 }) {
   return (
     <div className="flex flex-1">
       <div className="flex h-full w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-white p-2 dark:border-neutral-700 dark:bg-neutral-900">
-        <Flow saveAction={saveAction} nds={nodes} egs={edges} sts={status} />
+        <Flow
+          saveAction={saveAction}
+          nds={nodes}
+          egs={edges}
+          sts={status}
+          workflowId={workflowId}
+        />
       </div>
     </div>
   );

@@ -17,12 +17,14 @@ import { nodeTypes } from "./nodes/Nodes";
 import { Button } from "./ui/button";
 import { Circle } from "lucide-react";
 import ToolBar from "./ToolBar";
+import { useUser } from "@clerk/nextjs";
 
 export default function Flow({
   saveAction,
   nds,
   egs,
   sts,
+  workflowId,
 }: {
   saveAction: (
     nodes: Node[],
@@ -34,29 +36,12 @@ export default function Flow({
   nds?: Node[];
   egs?: Edge[];
   sts?: boolean;
+  workflowId?: string;
 }) {
   const [status, setStatus] = useState<boolean>(false);
-  const [nodes, setNodes, onNodesChange] = useNodesState([
-    // {
-    //   id: "1",
-    //   type: "triggerManually",
-    //   position: { x: 100, y: 100 },
-    //   data: {},
-    // },
-    // {
-    //   id: "2",
-    //   type: "showOutput",
-    //   position: { x: 800, y: 200 },
-    //   data: {},
-    // },
-    // {
-    //   id: "3",
-    //   type: "geminiNode",
-    //   position: { x: 400, y: 100 },
-    //   data: {},
-    // },
-  ]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { user } = useUser();
 
   const handleSend = useCallback(
     (sourceId: string, payload: JSON) => {
@@ -79,11 +64,30 @@ export default function Flow({
     [setEdges],
   );
 
-  const nodesWithHandlers = nodes.map((n) =>
-    n.type === "triggerManually" || "geminiNode"
-      ? { ...n, data: { ...n.data, onSend: handleSend } }
-      : n,
-  );
+  const nodesWithHandlers = nodes.map((n) => {
+    if (n.type === "triggerManually") {
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          onSend: handleSend,
+          workflowId,
+        },
+      };
+    }
+
+    if (n.type === "geminiNode") {
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          onSend: handleSend,
+        },
+      };
+    }
+
+    return n;
+  });
 
   useEffect(() => {
     if (nds && nodes.length === 0) {
@@ -132,8 +136,45 @@ export default function Flow({
             Save
           </Button>
           <Button
-            onClick={() => {
-              setStatus((prev) => !prev);
+            onClick={async () => {
+              if (!workflowId) {
+                console.error("No workflowId provided");
+                return;
+              }
+
+              if (!user?.id) {
+                console.error("No user found");
+                return;
+              }
+
+              const newStatus = status ? "not-active" : "active";
+
+              try {
+                const response = await fetch(
+                  `${process.env.NEXT_PUBLIC_BACKEND_URL}/workflow/status`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      workflow_id: workflowId,
+                      user_id: user.id,
+                      status: newStatus,
+                    }),
+                  },
+                );
+
+                if (!response.ok) {
+                  const text = await response.text();
+                  console.error("Failed to update workflow status:", text);
+                  return;
+                }
+
+                setStatus((prev) => !prev);
+              } catch (err) {
+                console.error("Status update error:", err);
+              }
             }}
           >
             {status ? "Deactivate" : "Activate"}

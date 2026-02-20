@@ -20,8 +20,8 @@ export default function Home() {
       id: id,
       workflow_name: "test",
       user_id: user?.id,
-      nodes: JSON.stringify(nodes),
-      edges: JSON.stringify(edges),
+      nodes: nodes,
+      edges: edges,
       status: status ? "active" : "not-active",
     });
   };

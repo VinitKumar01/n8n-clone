@@ -24,8 +24,8 @@ export default function MyWorkflowsPage({
     axios.put(BACKEND_URL + "/workflow", {
       workflow_name: "test",
       user_id: user?.id,
-      nodes: JSON.stringify(nodes),
-      edges: JSON.stringify(edges),
+      nodes: nodes,
+      edges: edges,
       status: status ? "active" : "not-active",
       workflow_id: id,
     });
@@ -53,6 +53,7 @@ export default function MyWorkflowsPage({
       nodes={nodes}
       edges={edges}
       status={status}
+      workflowId={id}
     />
   );
 }
