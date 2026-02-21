@@ -35,9 +35,9 @@ export default function MyWorkflowsPage({
     const fetchWorkflow = async () => {
       const workflow = await getWorkflow(id);
       if (workflow) {
-        const nodes = JSON.parse(workflow.nodes);
+        const nodes = workflow.nodes;
         setNodes(nodes);
-        const edges = JSON.parse(workflow.edges);
+        const edges = workflow.edges;
         setEdges(edges);
         const status = workflow.status == "active" ? true : false;
         setStatus(status);

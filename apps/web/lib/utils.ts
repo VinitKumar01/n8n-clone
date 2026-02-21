@@ -1,5 +1,6 @@
 import axios from "axios";
 import { clsx, type ClassValue } from "clsx";
+import { Edge, Node } from "reactflow";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -9,8 +10,8 @@ export function cn(...inputs: ClassValue[]) {
 type Workflow = {
   id: string;
   workflow_name: string;
-  nodes: string;
-  edges: string;
+  nodes: Node[];
+  edges: Edge[];
   status: "active" | "not-active";
   user_id: string;
 };

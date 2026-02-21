@@ -12,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/vinitkumar01/n8n-clone/internal/database"
 	"github.com/vinitkumar01/n8n-clone/routes"
+	"github.com/vinitkumar01/n8n-clone/utils"
 
 	_ "github.com/lib/pq"
 )
@@ -76,6 +77,8 @@ func main() {
 	}
 
 	fmt.Printf("Server starting at port %s\n", port)
+
+	utils.RegisterNodes()
 
 	err = srv.ListenAndServe()
 	if err != nil {

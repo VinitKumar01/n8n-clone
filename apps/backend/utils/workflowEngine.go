@@ -1,6 +1,9 @@
 package utils
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 func CollectInputs(
 	nodeID string,
@@ -21,6 +24,7 @@ func CollectInputs(
 }
 
 func ExecuteNode(
+	ctx context.Context,
 	nodeID string,
 	dag *DAG,
 	execCtx *ExecutionContext,
@@ -30,11 +34,17 @@ func ExecuteNode(
 	inputs := CollectInputs(nodeID, dag, execCtx)
 
 	executor := NodeRegistry[node.Type]
-	output, err := executor(context.Background(), node, inputs)
+	if executor == nil {
+		return fmt.Errorf("no executor registered for node type %q", node.Type)
+	}
+
+	fmt.Println("[executeNode] running", nodeID, "type", node.Type, "inputs:", inputs)
+	output, err := executor(ctx, node, inputs)
 	if err != nil {
 		return err
 	}
 
 	execCtx.Results[nodeID] = output
+	fmt.Println("[executeNode] finished", nodeID, "output:", output)
 	return nil
 }

@@ -22,22 +22,24 @@ func (q *TaskQueue) StartWorkers(
 	workerCount int,
 	execute func(context.Context, string) error,
 ) {
-	for range workerCount {
+	for i := range workerCount {
+		workerID := i
 		go func() {
+			fmt.Printf("[taskqueue] worker %d started\n", workerID)
 			for {
 				select {
 				case <-ctx.Done():
+					fmt.Printf("[taskqueue] worker %d stopping: ctx done\n", workerID)
 					return
-
 				case nodeID, ok := <-q.jobs:
 					if !ok {
+						fmt.Printf("[taskqueue] worker %d stopping: jobs channel closed\n", workerID)
 						return
 					}
 
 					if err := execute(ctx, nodeID); err != nil {
-						fmt.Println("node execution error:", err)
+						fmt.Println("[taskqueue] node execution error:", err)
 					}
-
 					q.wg.Done()
 				}
 			}

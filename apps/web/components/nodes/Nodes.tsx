@@ -27,17 +27,60 @@ import { Button } from "../ui/button";
 import { WebhookIcon } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 
-function TriggerManually({
+export type NodePayload = unknown;
+
+export type OnSend = (nodeId: string, payload: NodePayload) => void;
+
+type MutableNodeData<T> = T & { [key: string]: unknown };
+
+export type TriggerData = MutableNodeData<{
+  onSend?: OnSend;
+  workflowId?: string;
+  received?: NodePayload;
+}>;
+
+export type GeminiInputs = {
+  apiKey?: string;
+  model?: string;
+  prompt?: string;
+};
+
+export type GeminiData = MutableNodeData<{
+  inputs?: GeminiInputs;
+  onSend?: OnSend;
+  received?: NodePayload;
+}>;
+
+export type ShowOutputData = MutableNodeData<{
+  received?: NodePayload;
+}>;
+
+export type WebhookData = MutableNodeData<{
+  inputs?: { path?: string };
+}>;
+
+function isString(v: unknown): v is string {
+  return typeof v === "string";
+}
+
+function prettyPrintPayload(p: NodePayload): string {
+  if (p === null || p === undefined) return "<no output yet>";
+  if (isString(p)) return p;
+  try {
+    return JSON.stringify(p, null, 2);
+  } catch {
+    return String(p);
+  }
+}
+
+export function TriggerManually({
   id,
   data,
 }: {
   id: string;
-  data: {
-    onSend: (id: string, payload: any) => void;
-    workflowId?: string;
-  };
+  data: TriggerData;
 }) {
-  const workflowId = data.workflowId;
+  const workflowId = data.workflowId as string | undefined;
   const { user } = useUser();
 
   const executeNode = useCallback(async () => {
@@ -69,12 +112,15 @@ function TriggerManually({
         return;
       }
 
-      const body = await response.json();
+      const body = (await response.json()) as {
+        results?: Record<string, NodePayload>;
+      };
+
       const results = body.results ?? {};
 
       Object.entries(results).forEach(([nodeId, payload]) => {
         try {
-          data.onSend(nodeId, payload);
+          data.onSend?.(nodeId, payload);
         } catch (e) {
           console.error("onSend error for node", nodeId, e);
         }
@@ -98,32 +144,31 @@ function TriggerManually({
   );
 }
 
-function GeminiNode({
-  data,
-}: {
-  id: string;
-  data: {
-    inputs?: { apiKey?: string; model?: string; prompt?: string };
-    onSend?: (id: string, payload: any) => void;
-    received?: any;
-  };
-}) {
+export function GeminiNode({ data }: { id: string; data: GeminiData }) {
   const promptRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
-  const [prompt, setPrompt] = useState<string | undefined>(data.inputs?.prompt);
-  const [apiKey, setApiKey] = useState<string | undefined>(data.inputs?.apiKey);
-  const [model, setModel] = useState<string>(
-    data.inputs?.model || "gemini-2.5-flash",
+
+  const [prompt, setPrompt] = useState<string | undefined>(
+    (data.inputs as GeminiInputs | undefined)?.prompt,
   );
-  const [output, setOutput] = useState<any>(data.received ?? null);
+  const [apiKey, setApiKey] = useState<string | undefined>(
+    (data.inputs as GeminiInputs | undefined)?.apiKey,
+  );
+  const [model, setModel] = useState<string>(
+    (data.inputs as GeminiInputs | undefined)?.model ?? "gemini-2.5-flash",
+  );
+
+  const [output, setOutput] = useState<NodePayload | null>(
+    (data.received as NodePayload) ?? null,
+  );
 
   useEffect(() => {
-    data.inputs = { apiKey, model, prompt };
+    data.inputs = { apiKey, model, prompt } as GeminiInputs;
   }, [apiKey, model, prompt, data]);
 
   useEffect(() => {
     if (data.received !== undefined) {
-      setOutput(data.received);
+      setOutput(data.received as NodePayload);
     }
   }, [data.received]);
 
@@ -189,8 +234,8 @@ function GeminiNode({
             </Select>
             <Button
               onClick={() => {
-                setApiKey(apiKeyRef.current?.value as string);
-                setPrompt(promptRef.current?.value as string);
+                setApiKey(apiKeyRef.current?.value ?? "");
+                setPrompt(promptRef.current?.value ?? "");
               }}
             >
               Save values
@@ -211,7 +256,7 @@ function GeminiNode({
       <div className="mt-3">
         <div className="text-xs text-muted-foreground mb-1">Output</div>
         <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
-          {output ? JSON.stringify(output, null, 2) : "<no output yet>"}
+          {output ? prettyPrintPayload(output) : "<no output yet>"}
         </pre>
       </div>
 
@@ -221,29 +266,31 @@ function GeminiNode({
   );
 }
 
-function ShowOutput({ data }: { data: { received?: any } }) {
+export function ShowOutput({ data }: { data: ShowOutputData }) {
+  const payload = data.received;
+
   return (
     <div className="p-2 border rounded-2xl bg-[#262626]">
       <div>Show Output</div>
       <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
-        {data.received ? JSON.stringify(data.received, null, 2) : ""}
+        {payload ? prettyPrintPayload(payload) : ""}
       </pre>
       <Handle type="target" position={Position.Left} />
     </div>
   );
 }
 
-function WebhookNode({
+export function WebhookNode({
   data,
   workflowId,
 }: {
-  data: {
-    inputs?: { path?: string };
-  };
+  data: WebhookData;
   workflowId?: string;
 }) {
   const pathRef = useRef<HTMLInputElement>(null);
-  const [path, setPath] = useState<string | undefined>(data.inputs?.path);
+  const [path, setPath] = useState<string | undefined>(
+    (data.inputs as { path?: string } | undefined)?.path,
+  );
   const [url, setUrl] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -291,7 +338,7 @@ function WebhookNode({
             />
             <Button
               onClick={() => {
-                setPath(pathRef.current?.value as string);
+                setPath(pathRef.current?.value ?? "");
               }}
             >
               Save values

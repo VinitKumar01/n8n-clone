@@ -12,8 +12,8 @@ type Node struct {
 }
 
 type Edge struct {
-	From string `json:"from"`
-	To   string `json:"to"`
+	From string `json:"source"`
+	To   string `json:"target"`
 }
 
 type DAG struct {

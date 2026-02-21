@@ -30,9 +30,20 @@ func ExecuteShowOutput(
 	node Node,
 	inputs map[string]any,
 ) (any, error) {
-	fmt.Println("Inputs:", inputs)
+	if len(inputs) == 0 {
+		return "No input received", nil
+	}
 
-	return inputs, nil
+	if len(inputs) == 1 {
+		for _, v := range inputs {
+			return v, nil
+		}
+	}
+
+	return map[string]any{
+		"mergedInputs": inputs,
+		"message":      "Multiple inputs received",
+	}, nil
 }
 
 func ExecuteGeminiNode(
@@ -40,22 +51,27 @@ func ExecuteGeminiNode(
 	node Node,
 	inputs map[string]any,
 ) (any, error) {
-	prompt, ok := node.Data["prompt"].(string)
+	inputConfig, ok := node.Data["inputs"].(map[string]any)
 	if !ok {
+		return nil, fmt.Errorf("gemini node missing inputs config")
+	}
+
+	prompt, ok := inputConfig["prompt"].(string)
+	if !ok || prompt == "" {
 		return nil, fmt.Errorf("error while parsing prompt")
 	}
 
-	apiKey, ok := node.Data["apiKey"].(string)
-	if !ok {
+	apiKey, ok := inputConfig["apiKey"].(string)
+	if !ok || apiKey == "" {
 		return nil, fmt.Errorf("error while parsing apiKey")
 	}
 
-	model, ok := node.Data["model"].(string)
-	if !ok {
+	model, ok := inputConfig["model"].(string)
+	if !ok || model == "" {
 		return nil, fmt.Errorf("error while parsing model")
 	}
 
-	response, err := GetGeminiResponse(context.Background(), map[string]any{
+	response, err := GetGeminiResponse(ctx, map[string]any{
 		"prompt": prompt,
 		"apiKey": apiKey,
 		"model":  model,

@@ -44,21 +44,24 @@ export default function Flow({
   const { user } = useUser();
 
   const handleSend = useCallback(
-    (sourceId: string, payload: JSON) => {
-      setNodes((nds) => {
-        const targets = edges
-          .filter((e) => e.source === sourceId)
-          .map((e) => e.target);
-
-        return nds.map((n) =>
-          targets.includes(n.id)
-            ? { ...n, data: { ...n.data, received: payload } }
+    (nodeId: string, payload: string) => {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  received: payload,
+                },
+              }
             : n,
-        );
-      });
+        ),
+      );
     },
-    [edges, setNodes],
+    [setNodes],
   );
+
   const onConnect = useCallback(
     (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges],

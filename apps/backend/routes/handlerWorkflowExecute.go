@@ -116,6 +116,12 @@ func (db Db) HandlerWorkflowExecute(w http.ResponseWriter, r *http.Request) {
 		"triggeredBy": params.UserId,
 	}
 
+	if err := utils.ExecuteNode(r.Context(), params.StartNode, dag, execCtx); err != nil {
+		utils.RespondWithError(w, 500, fmt.Sprintf("Failed to execute start node: %v", err))
+		return
+	}
+	fmt.Println("[handler] executed start node:", params.StartNode, "output:", execCtx.Results[params.StartNode])
+
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
@@ -125,7 +131,8 @@ func (db Db) HandlerWorkflowExecute(w http.ResponseWriter, r *http.Request) {
 	queue := utils.NewTaskQueue(100)
 
 	queue.StartWorkers(ctx, 4, func(ctx context.Context, nodeID string) error {
-		if err := utils.ExecuteNode(nodeID, dag, execCtx); err != nil {
+		fmt.Println("[worker-wrapper] received job:", nodeID)
+		if err := utils.ExecuteNode(ctx, nodeID, dag, execCtx); err != nil {
 			errCh <- err
 			cancel()
 			return err
@@ -136,7 +143,9 @@ func (db Db) HandlerWorkflowExecute(w http.ResponseWriter, r *http.Request) {
 
 		for _, child := range dag.Edges[nodeID] {
 			execCtx.InDegree[child]--
+			fmt.Printf("[worker-wrapper] decremented indegree of %s -> %d\n", child, execCtx.InDegree[child])
 			if execCtx.InDegree[child] == 0 {
+				fmt.Printf("[worker-wrapper] enqueueing child %s\n", child)
 				queue.Enqueue(child)
 			}
 		}
