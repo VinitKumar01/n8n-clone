@@ -26,6 +26,17 @@ import {
 import { Button } from "../ui/button";
 import { WebhookIcon } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
+import GeminiIcon from "@/app/icons/GeminiIcon";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../ui/alert-dialog";
 
 export type NodePayload = unknown;
 
@@ -35,8 +46,9 @@ type MutableNodeData<T> = T & { [key: string]: unknown };
 
 export type TriggerData = MutableNodeData<{
   onSend?: OnSend;
-  workflowId?: string;
+  workflowId: string;
   received?: NodePayload;
+  status: boolean;
 }>;
 
 export type GeminiInputs = {
@@ -80,12 +92,11 @@ export function TriggerManually({
   id: string;
   data: TriggerData;
 }) {
-  const workflowId = data.workflowId as string | undefined;
+  const status = data.status;
   const { user } = useUser();
 
   const executeNode = useCallback(async () => {
-    if (!workflowId) {
-      console.error("No workflowId provided to TriggerManually");
+    if (!data.workflowId || !status) {
       return;
     }
 
@@ -94,7 +105,7 @@ export function TriggerManually({
       myHeaders.append("Content-Type", "application/json");
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/workflow/${workflowId}/execute`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/workflow/${data.workflowId}/execute`,
         {
           method: "POST",
           headers: myHeaders,
@@ -128,20 +139,42 @@ export function TriggerManually({
     } catch (err) {
       console.error("Error executing workflow:", err);
     }
-  }, [id, data, workflowId, user?.id]);
+  }, [id, data, user?.id, status]);
 
-  return (
+  const TriggerContent = (
     <div
       className="border p-4 bg-[#262626] rounded-2xl cursor-pointer"
-      onClick={executeNode}
       role="button"
       title="Run workflow from this node"
+      onClick={data.workflowId ? executeNode : undefined}
     >
       <IconPointer size={35} />
       <pre className="font-semibold">Click</pre>
       <Handle type="source" position={Position.Right} />
     </div>
   );
+
+  if (!data.workflowId || !status) {
+    return (
+      <AlertDialog>
+        <AlertDialogTrigger asChild>{TriggerContent}</AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{"Can't trigger this node"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action can only be done when the workflow is saved and
+              activated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Okay</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
+
+  return TriggerContent;
 }
 
 export function GeminiNode({ data }: { id: string; data: GeminiData }) {
@@ -175,14 +208,8 @@ export function GeminiNode({ data }: { id: string; data: GeminiData }) {
   return (
     <div className="bg-[#262626] p-4 rounded-2xl">
       <Dialog>
-        <DialogTrigger>
-          <Image
-            src={"gemini-color.svg"}
-            alt="Gemini"
-            width={50}
-            height={50}
-            className="cursor-pointer"
-          />
+        <DialogTrigger className="flex justify-center items-center w-full">
+          <GeminiIcon />
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
@@ -374,7 +401,7 @@ export const nodes = [
       return (
         <div className="h-full bg-[#262626] p-4 rounded-2xl flex justify-center items-center">
           <Image
-            src={"gemini-color.svg"}
+            src={"/gemini-color.svg"}
             alt="Gemini"
             width={50}
             height={50}

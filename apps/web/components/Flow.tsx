@@ -74,7 +74,8 @@ export default function Flow({
         data: {
           ...n.data,
           onSend: handleSend,
-          workflowId,
+          workflowId: workflowId,
+          status: status,
         },
       };
     }
@@ -139,6 +140,7 @@ export default function Flow({
             Save
           </Button>
           <Button
+            disabled={!workflowId}
             onClick={async () => {
               if (!workflowId) {
                 console.error("No workflowId provided");
