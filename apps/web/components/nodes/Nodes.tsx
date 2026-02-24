@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Handle, Position } from "reactflow";
+import { Handle, Position, Node as RFNode } from "reactflow";
 import "reactflow/dist/style.css";
 import { IconPointer } from "@tabler/icons-react";
 import {
@@ -38,8 +38,10 @@ import {
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
 
-export type NodePayload = unknown;
+import type { Dispatch, SetStateAction } from "react";
+import type { AppNodeData } from "../Flow";
 
+export type NodePayload = unknown;
 export type OnSend = (nodeId: string, payload: NodePayload) => void;
 
 type MutableNodeData<T> = T & { [key: string]: unknown };
@@ -61,6 +63,7 @@ export type GeminiData = MutableNodeData<{
   inputs?: GeminiInputs;
   onSend?: OnSend;
   received?: NodePayload;
+  setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
 }>;
 
 export type ShowOutputData = MutableNodeData<{
@@ -69,6 +72,7 @@ export type ShowOutputData = MutableNodeData<{
 
 export type WebhookData = MutableNodeData<{
   inputs?: { path?: string };
+  setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
 }>;
 
 function isString(v: unknown): v is string {
@@ -177,7 +181,7 @@ export function TriggerManually({
   return TriggerContent;
 }
 
-export function GeminiNode({ data }: { id: string; data: GeminiData }) {
+export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
   const promptRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
 
@@ -194,10 +198,6 @@ export function GeminiNode({ data }: { id: string; data: GeminiData }) {
   const [output, setOutput] = useState<NodePayload | null>(
     (data.received as NodePayload) ?? null,
   );
-
-  useEffect(() => {
-    data.inputs = { apiKey, model, prompt } as GeminiInputs;
-  }, [apiKey, model, prompt, data]);
 
   useEffect(() => {
     if (data.received !== undefined) {
@@ -259,10 +259,32 @@ export function GeminiNode({ data }: { id: string; data: GeminiData }) {
                 </SelectGroup>
               </SelectContent>
             </Select>
+
             <Button
               onClick={() => {
-                setApiKey(apiKeyRef.current?.value ?? "");
-                setPrompt(promptRef.current?.value ?? "");
+                const newApiKey = apiKeyRef.current?.value ?? "";
+                const newPrompt = promptRef.current?.value ?? "";
+
+                setApiKey(newApiKey);
+                setPrompt(newPrompt);
+
+                data.setNodes?.((nds) =>
+                  nds.map((node) =>
+                    node.id === id
+                      ? {
+                          ...node,
+                          data: {
+                            ...node.data,
+                            inputs: {
+                              apiKey: newApiKey,
+                              model,
+                              prompt: newPrompt,
+                            },
+                          },
+                        }
+                      : node,
+                  ),
+                );
               }}
             >
               Save values
@@ -308,9 +330,11 @@ export function ShowOutput({ data }: { data: ShowOutputData }) {
 }
 
 export function WebhookNode({
+  id,
   data,
   workflowId,
 }: {
+  id: string;
   data: WebhookData;
   workflowId?: string;
 }) {
@@ -319,10 +343,6 @@ export function WebhookNode({
     (data.inputs as { path?: string } | undefined)?.path,
   );
   const [url, setUrl] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    data.inputs = { path };
-  }, [path, data]);
 
   useEffect(() => {
     if (workflowId && path) {
@@ -365,7 +385,23 @@ export function WebhookNode({
             />
             <Button
               onClick={() => {
-                setPath(pathRef.current?.value ?? "");
+                const newPath = pathRef.current?.value ?? "";
+
+                setPath(newPath);
+
+                data.setNodes?.((nds) =>
+                  nds.map((node) =>
+                    node.id === id
+                      ? {
+                          ...node,
+                          data: {
+                            ...node.data,
+                            inputs: { path: newPath },
+                          },
+                        }
+                      : node,
+                  ),
+                );
               }}
             >
               Save values

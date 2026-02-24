@@ -11,6 +11,7 @@ import ReactFlow, {
   Connection,
   Edge,
   Node,
+  XYPosition,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { nodeTypes } from "./nodes/Nodes";
@@ -18,6 +19,21 @@ import { Button } from "./ui/button";
 import { Circle } from "lucide-react";
 import ToolBar from "./ToolBar";
 import { useUser } from "@clerk/nextjs";
+
+import type {
+  TriggerData,
+  GeminiData,
+  ShowOutputData,
+  WebhookData,
+} from "./nodes/Nodes";
+
+export type AppNodeData =
+  | TriggerData
+  | GeminiData
+  | ShowOutputData
+  | WebhookData;
+
+export type AppNode = Node<AppNodeData>;
 
 export default function Flow({
   saveAction,
@@ -27,21 +43,39 @@ export default function Flow({
   workflowId,
 }: {
   saveAction: (
-    nodes: Node[],
+    nodes: Node<AppNodeData>[],
     edges: Edge[],
     status: boolean,
     id?: string,
   ) => void;
   id?: string;
-  nds?: Node[];
+  nds?: Node<AppNodeData>[];
   egs?: Edge[];
   sts?: boolean;
   workflowId?: string;
 }) {
   const [status, setStatus] = useState<boolean>(false);
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<AppNodeData>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const { user } = useUser();
+
+  const [isSaved, setIsSaved] = useState(true);
+  const [lastSaved, setLastSaved] = useState<{
+    nodes: Node<AppNodeData>[];
+    edges: Edge[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (!lastSaved) return;
+
+    const nodesChanged =
+      JSON.stringify(nodes) !== JSON.stringify(lastSaved.nodes);
+    const edgesChanged =
+      JSON.stringify(edges) !== JSON.stringify(lastSaved.edges);
+
+    setIsSaved(!(nodesChanged || edgesChanged));
+  }, [nodes, edges, lastSaved]);
 
   const handleSend = useCallback(
     (nodeId: string, payload: string) => {
@@ -53,7 +87,7 @@ export default function Flow({
                 data: {
                   ...n.data,
                   received: payload,
-                },
+                } as AppNodeData,
               }
             : n,
         ),
@@ -67,16 +101,18 @@ export default function Flow({
     [setEdges],
   );
 
-  const nodesWithHandlers = nodes.map((n) => {
+  const nodesWithHandlers: Node<AppNodeData>[] = nodes.map((n) => {
+    const baseData = (n.data ?? {}) as AppNodeData;
+
     if (n.type === "triggerManually") {
       return {
         ...n,
         data: {
-          ...n.data,
+          ...baseData,
           onSend: handleSend,
-          workflowId: workflowId,
-          status: status,
-        },
+          workflowId,
+          status,
+        } as AppNodeData,
       };
     }
 
@@ -84,35 +120,41 @@ export default function Flow({
       return {
         ...n,
         data: {
-          ...n.data,
+          ...baseData,
           onSend: handleSend,
-        },
+          setNodes,
+        } as AppNodeData,
       };
     }
 
-    return n;
+    if (n.type === "webhookNode") {
+      return {
+        ...n,
+        data: {
+          ...baseData,
+          setNodes,
+        } as AppNodeData,
+      };
+    }
+
+    return { ...n, data: baseData };
   });
 
   useEffect(() => {
     if (nds && nodes.length === 0) {
       setNodes(nds);
+      setLastSaved({ nodes: nds, edges: egs ?? [] });
+      setIsSaved(true);
     }
+
     if (egs && edges.length === 0) {
       setEdges(egs);
     }
-    if (sts) {
+
+    if (sts !== undefined) {
       setStatus(sts);
     }
-  }, [
-    nds,
-    egs,
-    sts,
-    setStatus,
-    setEdges,
-    setNodes,
-    nodes.length,
-    edges.length,
-  ]);
+  }, [nds, egs, sts, edges.length, nodes.length, setNodes, setEdges]);
 
   return (
     <div className="w-full h-full">
@@ -135,10 +177,14 @@ export default function Flow({
           <Button
             onClick={() => {
               saveAction(nodesWithHandlers, edges, status);
+              setLastSaved({ nodes, edges });
+              setIsSaved(true);
             }}
+            disabled={isSaved}
           >
             Save
           </Button>
+
           <Button
             disabled={!workflowId}
             onClick={async () => {
@@ -186,6 +232,7 @@ export default function Flow({
           </Button>
         </div>
       </div>
+
       <ReactFlow
         nodes={nodesWithHandlers}
         edges={edges}
@@ -200,19 +247,22 @@ export default function Flow({
         <Background />
         <ToolBar
           setNodesAction={(nd) => {
-            setNodes((prev) => {
+            setNodes((prev: Node<AppNodeData>[]) => {
               const last = prev[prev.length - 1];
-              return [
-                ...prev,
-                {
-                  ...nd,
-                  id: last ? `${parseInt(last.id) + 1}` : "1",
-                  position: {
-                    x: last ? last.position.x + 10 : 100,
-                    y: last ? last.position.y + 10 : 100,
-                  },
+              const newId = last ? `${Number(last.id) + 1}` : "1";
+
+              const template = nd as Partial<Node<AppNodeData>>;
+              const newNode: Node<AppNodeData> = {
+                id: newId,
+                type: template.type ?? "default",
+                position: (template.position as XYPosition) ?? {
+                  x: last ? last.position.x + 10 : 100,
+                  y: last ? last.position.y + 10 : 100,
                 },
-              ];
+                data: (template.data as AppNodeData) ?? ({} as AppNodeData),
+              };
+
+              return [...prev, newNode];
             });
           }}
         />

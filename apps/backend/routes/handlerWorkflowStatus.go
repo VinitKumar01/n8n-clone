@@ -53,56 +53,6 @@ func (db Db) HandlerWorkflowStatus(w http.ResponseWriter, r *http.Request) {
 
 	qtx := db.Queries.WithTx(tx)
 
-	if params.Status == utils.WorkflowStatusActive {
-		var nodes []utils.Node
-		if err := json.Unmarshal(workflow.Nodes, &nodes); err != nil {
-			utils.RespondWithError(w, 400, fmt.Sprintf("Error parsing nodes: %v", err))
-			return
-		}
-
-		var edges []utils.Edge
-		if err := json.Unmarshal(workflow.Edges, &edges); err != nil {
-			utils.RespondWithError(w, 400, fmt.Sprintf("Error parsing edges: %v", err))
-			return
-		}
-
-		dag := utils.BuildDAG(nodes, edges)
-		if utils.HasCycle(&dag) {
-			utils.RespondWithError(w, 400, "Workflow has cycles — cannot activate")
-			return
-		}
-
-		workflowMetadata := struct {
-			Edges      map[string][]string
-			InDegree   map[string]int
-			StartNodes []string
-		}{
-			Edges:    dag.Edges,
-			InDegree: dag.InDegree,
-		}
-
-		for nodeID, deg := range dag.InDegree {
-			if deg == 0 {
-				workflowMetadata.StartNodes = append(workflowMetadata.StartNodes, nodeID)
-			}
-		}
-
-		edgesJSON, _ := json.Marshal(workflowMetadata.Edges)
-		inDegreeJSON, _ := json.Marshal(workflowMetadata.InDegree)
-		startNodesJSON, _ := json.Marshal(workflowMetadata.StartNodes)
-
-		err = qtx.UpsertWorkflowMetadata(r.Context(), database.UpsertWorkflowMetadataParams{
-			WorkflowID: workflow.ID,
-			Edges:      edgesJSON,
-			InDegree:   inDegreeJSON,
-			StartNodes: startNodesJSON,
-		})
-		if err != nil {
-			utils.RespondWithError(w, 500, fmt.Sprintf("Metadata save failed: %v", err))
-			return
-		}
-	}
-
 	_, err = qtx.UpdateWorkflowStatusById(r.Context(), database.UpdateWorkflowStatusByIdParams{
 		ID:        workflow.ID,
 		Status:    database.WorkflowStatus(params.Status),

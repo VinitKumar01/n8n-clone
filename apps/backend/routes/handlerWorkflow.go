@@ -89,7 +89,60 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workflow, err := db.Queries.UpdateWorkflowById(r.Context(), database.UpdateWorkflowByIdParams{
+	var nodes []utils.Node
+	if err := json.Unmarshal(params.Nodes, &nodes); err != nil {
+		utils.RespondWithError(w, 400, fmt.Sprintf("Error parsing nodes: %v", err))
+		return
+	}
+
+	var edges []utils.Edge
+	if err := json.Unmarshal(params.Edges, &edges); err != nil {
+		utils.RespondWithError(w, 400, fmt.Sprintf("Error parsing edges: %v", err))
+		return
+	}
+
+	dag := utils.BuildDAG(nodes, edges)
+
+	workflowMetadata := struct {
+		Edges      map[string][]string
+		InDegree   map[string]int
+		StartNodes []string
+	}{
+		Edges:    dag.Edges,
+		InDegree: dag.InDegree,
+	}
+
+	for nodeID, deg := range dag.InDegree {
+		if deg == 0 {
+			workflowMetadata.StartNodes = append(workflowMetadata.StartNodes, nodeID)
+		}
+	}
+
+	edgesJSON, _ := json.Marshal(workflowMetadata.Edges)
+	inDegreeJSON, _ := json.Marshal(workflowMetadata.InDegree)
+	startNodesJSON, _ := json.Marshal(workflowMetadata.StartNodes)
+
+	tx, err := db.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		utils.RespondWithError(w, 500, "Failed to start transaction")
+		return
+	}
+
+	qtx := db.Queries.WithTx(tx)
+
+	err = qtx.UpsertWorkflowMetadata(r.Context(), database.UpsertWorkflowMetadataParams{
+		WorkflowID: params.WorkflowId,
+		Edges:      edgesJSON,
+		InDegree:   inDegreeJSON,
+		StartNodes: startNodesJSON,
+	})
+	if err != nil {
+		tx.Rollback()
+		utils.RespondWithError(w, 500, fmt.Sprintf("Metadata save failed: %v", err))
+		return
+	}
+
+	workflow, err := qtx.UpdateWorkflowById(r.Context(), database.UpdateWorkflowByIdParams{
 		WorkflowName: params.WorkflowName,
 		Nodes:        params.Nodes,
 		Edges:        params.Edges,
@@ -99,7 +152,13 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:    time.Now().UTC(),
 	})
 	if err != nil {
+		tx.Rollback()
 		utils.RespondWithError(w, 400, fmt.Sprintf("Error updating the workflow: %v", err))
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		utils.RespondWithError(w, 500, "Commit failed")
 		return
 	}
 
