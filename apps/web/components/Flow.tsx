@@ -26,6 +26,7 @@ import type {
   ShowOutputData,
   WebhookData,
 } from "./nodes/Nodes";
+import { useDebouncedCallback } from "@/hooks/useDebounce";
 
 export type AppNodeData =
   | TriggerData
@@ -67,7 +68,10 @@ export default function Flow({
   } | null>(null);
 
   useEffect(() => {
-    if (!lastSaved) return;
+    if (!lastSaved) {
+      setIsSaved(false);
+      return;
+    }
 
     const nodesChanged =
       JSON.stringify(nodes) !== JSON.stringify(lastSaved.nodes);
@@ -155,6 +159,19 @@ export default function Flow({
       setStatus(sts);
     }
   }, [nds, egs, sts, edges.length, nodes.length, setNodes, setEdges]);
+
+  const save = async () => {
+    saveAction(nodesWithHandlers, edges, status);
+    setIsSaved(true);
+  };
+
+  const autoSave = useDebouncedCallback(save, 5000);
+
+  useEffect(() => {
+    if (workflowId) {
+      autoSave();
+    }
+  }, [autoSave, nodesWithHandlers, edges, status, workflowId]);
 
   return (
     <div className="w-full h-full">
