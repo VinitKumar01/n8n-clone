@@ -17,12 +17,13 @@ export default function Home() {
     nodes: Node[],
     edges: Edge[],
     status: boolean,
+    workflow_name: string,
     id?: string,
   ) => {
     try {
       const response = await axios.post(BACKEND_URL + "/workflow", {
         id: id,
-        workflow_name: "test",
+        workflow_name: workflow_name,
         user_id: user?.id,
         nodes: nodes,
         edges: edges,

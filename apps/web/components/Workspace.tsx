@@ -11,18 +11,20 @@ export default function Worksapce({
   edges,
   status,
   workflowId,
+  wfName,
 }: {
   saveAction: (
     nodes: Node[],
     edges: Edge[],
     status: boolean,
+    workflowName: string,
     id?: string,
   ) => void;
-  id?: string;
   nodes?: Node[];
   edges?: Edge[];
   status?: boolean;
   workflowId?: string;
+  wfName?: string;
 }) {
   return (
     <div className="flex flex-1">
@@ -33,6 +35,7 @@ export default function Worksapce({
           egs={edges}
           sts={status}
           workflowId={workflowId}
+          wfName={wfName}
         />
       </div>
     </div>

@@ -27,6 +27,14 @@ import type {
   WebhookData,
 } from "./nodes/Nodes";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
 
 export type AppNodeData =
   | TriggerData
@@ -42,23 +50,26 @@ export default function Flow({
   egs,
   sts,
   workflowId,
+  wfName,
 }: {
   saveAction: (
     nodes: Node<AppNodeData>[],
     edges: Edge[],
     status: boolean,
+    workflow_name: string,
     id?: string,
   ) => void;
-  id?: string;
   nds?: Node<AppNodeData>[];
   egs?: Edge[];
   sts?: boolean;
   workflowId?: string;
+  wfName?: string;
 }) {
   const [status, setStatus] = useState<boolean>(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [workflowName, setWorkflowName] = useState<string>("default");
   const { user } = useUser();
 
   const [isSaved, setIsSaved] = useState(true);
@@ -66,6 +77,9 @@ export default function Flow({
     nodes: Node<AppNodeData>[];
     edges: Edge[];
   } | null>(null);
+
+  const [nameDialogOpen, setNameDialogOpen] = useState(false);
+  const [nameInput, setNameInput] = useState("");
 
   useEffect(() => {
     if (!lastSaved) {
@@ -158,10 +172,13 @@ export default function Flow({
     if (sts !== undefined) {
       setStatus(sts);
     }
-  }, [nds, egs, sts, edges.length, nodes.length, setNodes, setEdges]);
+    if (wfName !== undefined) {
+      setWorkflowName(wfName);
+    }
+  }, [nds, egs, sts, wfName, edges.length, nodes.length, setNodes, setEdges]);
 
   const save = async () => {
-    saveAction(nodesWithHandlers, edges, status);
+    saveAction(nodesWithHandlers, edges, status, workflowName);
     setIsSaved(true);
   };
 
@@ -193,7 +210,11 @@ export default function Flow({
         <div className="gap-4 flex justify-end px-2">
           <Button
             onClick={() => {
-              saveAction(nodesWithHandlers, edges, status);
+              if (wfName === undefined) {
+                setNameDialogOpen(true);
+                return;
+              }
+              saveAction(nodesWithHandlers, edges, status, workflowName);
               setLastSaved({ nodes, edges });
               setIsSaved(true);
             }}
@@ -249,6 +270,50 @@ export default function Flow({
           </Button>
         </div>
       </div>
+
+      <Dialog
+        open={nameDialogOpen}
+        onOpenChange={(open) => setNameDialogOpen(open)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter workflow name</DialogTitle>
+          </DialogHeader>
+          <div className="pt-2">
+            <Input
+              value={nameInput}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setNameInput(e.target.value)
+              }
+              placeholder="Workflow name"
+            />
+          </div>
+          <DialogFooter className="pt-4">
+            <div className="flex gap-2 justify-end w-full">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setNameDialogOpen(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  const finalName = nameInput || "default";
+                  setWorkflowName(finalName);
+                  saveAction(nodesWithHandlers, edges, status, finalName);
+                  setLastSaved({ nodes, edges });
+                  setIsSaved(true);
+                  setNameDialogOpen(false);
+                }}
+              >
+                Done
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ReactFlow
         nodes={nodesWithHandlers}

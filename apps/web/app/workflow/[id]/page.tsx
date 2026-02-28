@@ -19,10 +19,16 @@ export default function MyWorkflowsPage({
   const [nodes, setNodes] = useState<Node[]>();
   const [edges, setEdges] = useState<Edge[]>();
   const [status, setStatus] = useState<boolean>();
+  const [workflowName, setWorkflowName] = useState<string>();
 
-  const saveAction = (nodes: Node[], edges: Edge[], status: boolean) => {
+  const saveAction = (
+    nodes: Node[],
+    edges: Edge[],
+    status: boolean,
+    workflowName: string,
+  ) => {
     axios.put(BACKEND_URL + "/workflow", {
-      workflow_name: "test",
+      workflow_name: workflowName,
       user_id: user?.id,
       nodes: nodes,
       edges: edges,
@@ -35,12 +41,14 @@ export default function MyWorkflowsPage({
     const fetchWorkflow = async () => {
       const workflow = await getWorkflow(id);
       if (workflow) {
-        const nodes = workflow.nodes;
-        setNodes(nodes);
-        const edges = workflow.edges;
-        setEdges(edges);
+        const nds = workflow.nodes;
+        setNodes(nds);
+        const edgs = workflow.edges;
+        setEdges(edgs);
         const status = workflow.status == "active" ? true : false;
         setStatus(status);
+        const wfName = workflow.workflow_name;
+        setWorkflowName(wfName);
       }
     };
 
@@ -54,6 +62,7 @@ export default function MyWorkflowsPage({
       edges={edges}
       status={status}
       workflowId={id}
+      wfName={workflowName}
     />
   );
 }
