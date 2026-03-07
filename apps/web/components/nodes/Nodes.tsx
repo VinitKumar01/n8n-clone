@@ -53,6 +53,11 @@ export type TriggerData = MutableNodeData<{
   status: boolean;
 }>;
 
+export type WebhookData = MutableNodeData<{
+  workflowId?: string;
+  status?: boolean;
+}>;
+
 export type GeminiInputs = {
   apiKey?: string;
   model?: string;
@@ -68,11 +73,6 @@ export type GeminiData = MutableNodeData<{
 
 export type ShowOutputData = MutableNodeData<{
   received?: NodePayload;
-}>;
-
-export type WebhookData = MutableNodeData<{
-  inputs?: { path?: string };
-  setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
 }>;
 
 function isString(v: unknown): v is string {
@@ -297,7 +297,7 @@ export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
         <div className="text-xs text-muted-foreground mb-2">
           Configured prompt
         </div>
-        <pre className="text-sm p-2 rounded bg-[#111111] break-words">
+        <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
           {prompt ?? "<not configured>"}
         </pre>
       </div>
@@ -329,96 +329,90 @@ export function ShowOutput({ data }: { data: ShowOutputData }) {
   );
 }
 
-export function WebhookNode({
-  id,
-  data,
-  workflowId,
-}: {
-  id: string;
-  data: WebhookData;
-  workflowId?: string;
-}) {
-  const pathRef = useRef<HTMLInputElement>(null);
-  const [path, setPath] = useState<string | undefined>(
-    (data.inputs as { path?: string } | undefined)?.path,
-  );
-  const [url, setUrl] = useState<string | undefined>(undefined);
+export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
+  const status = data.status;
+  const workflowId = data.workflowId;
+
+  const [url, setUrl] = useState<string>("");
 
   useEffect(() => {
-    if (workflowId && path) {
-      setUrl(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/webhook/${workflowId}/${path}`,
-      );
-    } else if (path) {
-      setUrl(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/webhook/<workflowId>/${path}`,
-      );
+    const base = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+    if (workflowId) {
+      setUrl(`${base}/webhook/${workflowId}/${id}`);
     } else {
-      setUrl(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/webhook/<workflowId>/<path>`,
-      );
+      setUrl(`${base}/webhook/<workflowId>/${id}`);
     }
-  }, [path, workflowId]);
+  }, [workflowId, id]);
 
-  return (
-    <div className="bg-[#262626] p-4 rounded-2xl">
-      <Dialog>
-        <DialogTrigger>
-          <WebhookIcon />
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Webhook Node options</DialogTitle>
-            <DialogTrigger className="flex justify-start">
-              <pre className="text-start text-wrap break-all">{`Your final url will be: ${url}`}</pre>
-            </DialogTrigger>
-            <DialogDescription>
-              This node will only work when the workflow is Saved and Activated.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col justify-center items-center gap-4 p-4 rounded-2xl">
-            <input
-              ref={pathRef}
-              placeholder="Path"
-              className="border border-dashed border-white rounded-md p-2"
-              defaultValue={path}
-            />
-            <Button
-              onClick={() => {
-                const newPath = pathRef.current?.value ?? "";
-
-                setPath(newPath);
-
-                data.setNodes?.((nds) =>
-                  nds.map((node) =>
-                    node.id === id
-                      ? {
-                          ...node,
-                          data: {
-                            ...node.data,
-                            inputs: { path: newPath },
-                          },
-                        }
-                      : node,
-                  ),
-                );
-              }}
-            >
-              Save values
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+  const NodeBody = (
+    <div className="bg-[#262626] p-4 rounded-2xl cursor-pointer">
+      <div className="flex justify-center w-full">
+        <WebhookIcon />
+      </div>
 
       <div className="mt-2">
-        <div className="text-xs text-muted-foreground mb-1">Webhook path</div>
-        <pre className="text-sm p-2 rounded bg-[#111111] break-words">
-          {path ?? "<not configured>"}
+        <div className="text-xs text-muted-foreground mb-1">
+          Webhook trigger
+        </div>
+
+        <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
+          POST
         </pre>
       </div>
 
       <Handle type="source" position={Position.Right} />
     </div>
+  );
+
+  if (!workflowId || !status) {
+    return (
+      <AlertDialog>
+        <AlertDialogTrigger asChild>{NodeBody}</AlertDialogTrigger>
+
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Webhook not available</AlertDialogTitle>
+
+            <AlertDialogDescription>
+              Webhooks can only be used when the workflow is saved and
+              activated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogAction>Okay</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>{NodeBody}</DialogTrigger>
+
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Webhook Node</DialogTitle>
+          <DialogDescription>
+            Send a POST request to the URL below to trigger this workflow.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-4 p-4">
+          <div className="text-xs text-muted-foreground">Webhook URL</div>
+
+          <pre className="text-xs bg-[#111] p-2 rounded text-wrap break-all">
+            {url}
+          </pre>
+
+          <Button onClick={() => navigator.clipboard.writeText(url)}>
+            Copy URL
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

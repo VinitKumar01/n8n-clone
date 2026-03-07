@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -68,6 +69,7 @@ func main() {
 	v1Router.Get("/workflows/{userId}", db.HandlerGetWorkflowsByUserId)
 	v1Router.Post("/workflow/status", db.HandlerWorkflowStatus)
 	v1Router.Post("/clerk/webhook", db.HandlerClerkWebhook)
+	v1Router.Post("/webhook/{workflowID}/{nodeID}", db.HandlerWorkflowWebhook)
 
 	router.Mount("/v1", v1Router)
 
@@ -79,6 +81,11 @@ func main() {
 	fmt.Printf("Server starting at port %s\n", port)
 
 	utils.RegisterNodes()
+
+	err = utils.RegisterWebhooks(context.Background(), db.Queries)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	err = srv.ListenAndServe()
 	if err != nil {

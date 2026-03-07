@@ -149,9 +149,10 @@ export default function Flow({
       return {
         ...n,
         data: {
-          ...baseData,
-          setNodes,
-        } as AppNodeData,
+          ...n.data,
+          workflowId,
+          status,
+        },
       };
     }
 

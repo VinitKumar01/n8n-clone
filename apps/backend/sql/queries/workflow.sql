@@ -12,3 +12,6 @@ UPDATE workflow SET nodes = $1, edges = $2, workflow_name = $3, status = $4, upd
 
 -- name: UpdateWorkflowStatusById :one
 UPDATE workflow SET status = $1, updated_at = $2 WHERE id = $3 AND user_id = $4 RETURNING *;
+
+-- name: GetActiveWorkflows :many
+SELECT * FROM workflow WHERE status = 'active';

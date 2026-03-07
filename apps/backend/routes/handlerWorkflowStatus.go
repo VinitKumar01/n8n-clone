@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -70,5 +71,12 @@ func (db Db) HandlerWorkflowStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	committed = true
+
+	err = utils.RegisterWebhooks(context.Background(), db.Queries)
+	if err != nil {
+		utils.RespondWithError(w, 500, "Webhook registration failed")
+		return
+	}
+
 	utils.RespondWithJson(w, 200, "workflow status updated")
 }

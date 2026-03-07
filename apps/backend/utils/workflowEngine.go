@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"maps"
 )
 
 func CollectInputs(
@@ -32,6 +33,13 @@ func ExecuteNode(
 	node := dag.Nodes[nodeID]
 
 	inputs := CollectInputs(nodeID, dag, execCtx)
+
+	// preloading inputs for start nodes
+	if existing, ok := execCtx.Results[nodeID]; ok {
+		if m, ok := existing.(map[string]any); ok {
+			maps.Copy(inputs, m)
+		}
+	}
 
 	executor := NodeRegistry[node.Type]
 	if executor == nil {

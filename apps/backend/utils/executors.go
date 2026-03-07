@@ -79,3 +79,8 @@ func ExecuteGeminiNode(
 
 	return response, err
 }
+
+func ExecuteWebhookNode(ctx context.Context, node Node, inputs map[string]any) (any, error) {
+	fmt.Printf("Payload from executor: %v\n", inputs["payload"])
+	return inputs["payload"], nil
+}

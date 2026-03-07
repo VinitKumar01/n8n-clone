@@ -53,6 +53,42 @@ func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) 
 	return i, err
 }
 
+const getActiveWorkflows = `-- name: GetActiveWorkflows :many
+SELECT id, workflow_name, user_id, nodes, edges, status, created_at, updated_at FROM workflow WHERE status = 'active'
+`
+
+func (q *Queries) GetActiveWorkflows(ctx context.Context) ([]Workflow, error) {
+	rows, err := q.db.QueryContext(ctx, getActiveWorkflows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Workflow
+	for rows.Next() {
+		var i Workflow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkflowName,
+			&i.UserID,
+			&i.Nodes,
+			&i.Edges,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getWorkflowById = `-- name: GetWorkflowById :one
 SELECT id, workflow_name, user_id, nodes, edges, status, created_at, updated_at FROM workflow WHERE id = $1
 `
