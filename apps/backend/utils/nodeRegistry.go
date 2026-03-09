@@ -7,4 +7,5 @@ func RegisterNodes() {
 	NodeRegistry["showOutput"] = ExecuteShowOutput
 	NodeRegistry["geminiNode"] = ExecuteGeminiNode
 	NodeRegistry["webhookNode"] = ExecuteWebhookNode
+	NodeRegistry["mergeNode"] = ExecuteMergeNode
 }

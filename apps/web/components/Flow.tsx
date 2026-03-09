@@ -25,6 +25,7 @@ import type {
   GeminiData,
   ShowOutputData,
   WebhookData,
+  MergeData,
 } from "./nodes/Nodes";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import {
@@ -40,7 +41,8 @@ export type AppNodeData =
   | TriggerData
   | GeminiData
   | ShowOutputData
-  | WebhookData;
+  | WebhookData
+  | MergeData;
 
 export type AppNode = Node<AppNodeData>;
 

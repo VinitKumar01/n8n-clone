@@ -81,6 +81,14 @@ func ExecuteGeminiNode(
 }
 
 func ExecuteWebhookNode(ctx context.Context, node Node, inputs map[string]any) (any, error) {
-	fmt.Printf("Payload from executor: %v\n", inputs["payload"])
 	return inputs["payload"], nil
+}
+
+func ExecuteMergeNode(ctx context.Context, node Node, inputs map[string]any) (any, error) {
+	var mergedResults string
+	for _, input := range inputs {
+		result := AnyToString(input)
+		mergedResults = fmt.Sprintf("%v \n %v", mergedResults, result)
+	}
+	return mergedResults, nil
 }

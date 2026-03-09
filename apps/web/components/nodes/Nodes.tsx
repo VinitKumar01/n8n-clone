@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Button } from "../ui/button";
-import { WebhookIcon } from "lucide-react";
+import { MergeIcon, WebhookIcon } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import GeminiIcon from "@/app/icons/GeminiIcon";
 import {
@@ -72,6 +72,10 @@ export type GeminiData = MutableNodeData<{
 }>;
 
 export type ShowOutputData = MutableNodeData<{
+  received?: NodePayload;
+}>;
+
+export type MergeData = MutableNodeData<{
   received?: NodePayload;
 }>;
 
@@ -416,11 +420,31 @@ export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
   );
 }
 
+export function MergeNode({ data }: { data: MergeData }) {
+  const payload = data.received;
+
+  return (
+    <div className="p-2 border rounded-2xl bg-[#262626]">
+      <div className="flex justify-center items-center p-4 gap-2">
+        <MergeIcon />
+        <div>Merge</div>
+      </div>
+
+      <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
+        {payload ? prettyPrintPayload(payload) : ""}
+      </pre>
+      <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+
 export const nodeTypes = {
   triggerManually: TriggerManually,
   geminiNode: GeminiNode,
   showOutput: ShowOutput,
   webhookNode: WebhookNode,
+  mergeNode: MergeNode,
 };
 
 export const nodes = [
@@ -448,6 +472,20 @@ export const nodes = [
       return (
         <div className="p-4 h-full flex justify-center items-center border rounded-2xl bg-[#262626]">
           <div className="font-semibold">Output</div>
+        </div>
+      );
+    },
+  },
+  {
+    name: "Merge",
+    type: "mergeNode",
+    component: () => {
+      return (
+        <div className="p-4 h-full flex justify-center items-center border rounded-2xl bg-[#262626]">
+          <div className="flex flex-col justify-center items-center gap-2">
+            <MergeIcon />
+            <div>Merge</div>
+          </div>
         </div>
       );
     },
