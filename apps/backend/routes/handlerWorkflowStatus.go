@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -76,6 +77,13 @@ func (db Db) HandlerWorkflowStatus(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		utils.RespondWithError(w, 500, "Webhook registration failed")
 		return
+	}
+
+	utils.StopWorkflowSchedulers(params.WorkflowID)
+
+	err = utils.RegisterSchedulers(context.Background(), db.Queries)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	utils.RespondWithJson(w, 200, "workflow status updated")

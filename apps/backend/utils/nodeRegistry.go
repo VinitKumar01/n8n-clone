@@ -8,4 +8,5 @@ func RegisterNodes() {
 	NodeRegistry["geminiNode"] = ExecuteGeminiNode
 	NodeRegistry["webhookNode"] = ExecuteWebhookNode
 	NodeRegistry["mergeNode"] = ExecuteMergeNode
+	NodeRegistry["schedulerNode"] = ExecuteSchedulerNode
 }

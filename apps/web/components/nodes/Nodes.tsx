@@ -79,6 +79,15 @@ export type MergeData = MutableNodeData<{
   received?: NodePayload;
 }>;
 
+export type SchedulerData = MutableNodeData<{
+  inputs?: {
+    interval?: string;
+  };
+  workflowId?: string;
+  status?: boolean;
+  setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
+}>;
+
 function isString(v: unknown): v is string {
   return typeof v === "string";
 }
@@ -439,12 +448,120 @@ export function MergeNode({ data }: { data: MergeData }) {
   );
 }
 
+export function SchedulerNode({
+  id,
+  data,
+}: {
+  id: string;
+  data: SchedulerData;
+}) {
+  const [interval, setInterval] = useState<string>(
+    data.inputs?.interval ?? "5m",
+  );
+  const [inputValue, setInputValue] = useState<string>(
+    data.inputs?.interval ?? "5m",
+  );
+  const status = data.status;
+  const workflowId = data.workflowId;
+
+  const NodeBody = (
+    <div className="bg-[#262626] p-4 rounded-2xl cursor-pointer min-w-[160px]">
+      <div className="flex justify-center w-full mb-2">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      </div>
+      <div className="text-xs text-muted-foreground mb-1">Scheduler</div>
+      <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
+        every {interval}
+      </pre>
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+
+  if (!workflowId || !status) {
+    return (
+      <AlertDialog>
+        <AlertDialogTrigger asChild>{NodeBody}</AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Scheduler not active</AlertDialogTitle>
+            <AlertDialogDescription>
+              The scheduler only runs when the workflow is saved and activated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Okay</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>{NodeBody}</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Scheduler Node</DialogTitle>
+          <DialogDescription>
+            Set how often this workflow should run. Use Go duration syntax (e.g.
+            30s, 5m, 1h).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 p-4">
+          <div className="text-xs text-muted-foreground">Interval</div>
+          <input
+            className="border border-dashed border-white rounded-md p-2 bg-transparent"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="e.g. 30s, 5m, 1h"
+          />
+          <Button
+            onClick={() => {
+              const val = inputValue.trim() || "5m";
+              setInterval(val);
+              data.setNodes?.((nds: RFNode<AppNodeData>[]) =>
+                nds.map((node) =>
+                  node.id === id
+                    ? {
+                        ...node,
+                        data: {
+                          ...node.data,
+                          inputs: { interval: val },
+                        },
+                      }
+                    : node,
+                ),
+              );
+            }}
+          >
+            Save
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export const nodeTypes = {
   triggerManually: TriggerManually,
   geminiNode: GeminiNode,
   showOutput: ShowOutput,
   webhookNode: WebhookNode,
   mergeNode: MergeNode,
+  schedulerNode: SchedulerNode,
 };
 
 export const nodes = [
@@ -509,6 +626,31 @@ export const nodes = [
         <div className="h-full border p-4 bg-[#262626] rounded-2xl cursor-pointer">
           <IconPointer size={35} />
           <pre className="font-semibold">Click</pre>
+        </div>
+      );
+    },
+  },
+  {
+    name: "Scheduler",
+    type: "schedulerNode",
+    component: () => {
+      return (
+        <div className="h-full bg-[#262626] p-4 rounded-2xl flex flex-col justify-center items-center gap-1">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          <div className="text-xs font-semibold">Scheduler</div>
         </div>
       );
     },

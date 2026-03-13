@@ -87,6 +87,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = utils.RegisterSchedulers(context.Background(), db.Queries)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = srv.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)

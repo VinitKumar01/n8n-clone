@@ -92,3 +92,9 @@ func ExecuteMergeNode(ctx context.Context, node Node, inputs map[string]any) (an
 	}
 	return mergedResults, nil
 }
+
+func ExecuteSchedulerNode(ctx context.Context, node Node, inputs map[string]any) (any, error) {
+	return map[string]any{
+		"triggeredAt": time.Now().UTC(),
+	}, nil
+}

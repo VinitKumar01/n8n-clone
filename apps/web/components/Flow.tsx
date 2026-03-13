@@ -26,6 +26,7 @@ import type {
   ShowOutputData,
   WebhookData,
   MergeData,
+  SchedulerData,
 } from "./nodes/Nodes";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import {
@@ -42,7 +43,8 @@ export type AppNodeData =
   | GeminiData
   | ShowOutputData
   | WebhookData
-  | MergeData;
+  | MergeData
+  | SchedulerData;
 
 export type AppNode = Node<AppNodeData>;
 
@@ -155,6 +157,18 @@ export default function Flow({
           workflowId,
           status,
         },
+      };
+    }
+
+    if (n.type === "schedulerNode") {
+      return {
+        ...n,
+        data: {
+          ...baseData,
+          workflowId,
+          status,
+          setNodes,
+        } as AppNodeData,
       };
     }
 
