@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -11,20 +12,24 @@ import (
 	"github.com/vinitkumar01/n8n-clone/internal/database"
 )
 
-type rawEdge struct {
-	Source string `json:"source"`
-	Target string `json:"target"`
-}
-
-type rawNode struct {
-	ID   string         `json:"id"`
-	Type string         `json:"type"`
-	Data map[string]any `json:"data"`
-}
-
 var GlobalScheduler = NewScheduler()
 
 var schedulerJobMap sync.Map
+
+func unmarshalAny(raw any, dest any) error {
+	switch v := raw.(type) {
+	case string:
+		return json.Unmarshal([]byte(v), dest)
+	case []byte:
+		return json.Unmarshal(v, dest)
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(b, dest)
+	}
+}
 
 func RegisterSchedulers(ctx context.Context, q *database.Queries) error {
 	workflows, err := q.GetActiveWorkflows(ctx)
@@ -33,9 +38,9 @@ func RegisterSchedulers(ctx context.Context, q *database.Queries) error {
 	}
 
 	for _, wf := range workflows {
-		var nodes []rawNode
-		if err := json.Unmarshal(wf.Nodes, &nodes); err != nil {
-			fmt.Println("failed parsing nodes for scheduler:", err)
+		var nodes []Node
+		if err := unmarshalAny(wf.Nodes, &nodes); err != nil {
+			fmt.Printf("scheduler: failed to parse nodes for workflow %s: %v\n", wf.ID, err)
 			continue
 		}
 
@@ -50,24 +55,19 @@ func RegisterSchedulers(ctx context.Context, q *database.Queries) error {
 				continue
 			}
 
-			workflowID := wf.ID
-			nodeID := node.ID
-
 			event := TriggerEvent{
-				WorkflowID:    workflowID.String(),
-				TriggerNodeID: nodeID,
+				WorkflowID:    wf.ID.String(),
+				TriggerNodeID: node.ID,
 				Input:         map[string]any{"triggeredAt": time.Now().UTC()},
 			}
 
-			triggerFn := buildTriggerFn(q, workflowID)
+			jobID := GlobalScheduler.StartSchedule(ctx, interval, event, buildTriggerFn(q, wf.ID))
 
-			jobID := GlobalScheduler.StartSchedule(ctx, interval, event, triggerFn)
-
-			mapKey := fmt.Sprintf("%s/%s", workflowID, nodeID)
+			mapKey := fmt.Sprintf("%s/%s", wf.ID, node.ID)
 			schedulerJobMap.Store(mapKey, jobID)
 
 			fmt.Printf("registered scheduler: workflow=%s node=%s interval=%s jobID=%s\n",
-				workflowID, nodeID, interval, jobID)
+				wf.ID, node.ID, interval, jobID)
 		}
 	}
 
@@ -75,14 +75,13 @@ func RegisterSchedulers(ctx context.Context, q *database.Queries) error {
 }
 
 func StopWorkflowSchedulers(workflowID uuid.UUID) {
+	prefix := workflowID.String() + "/"
 	schedulerJobMap.Range(func(key, value any) bool {
 		k := key.(string)
-		prefix := workflowID.String() + "/"
 		if len(k) >= len(prefix) && k[:len(prefix)] == prefix {
-			jobID := value.(string)
-			GlobalScheduler.Stop(jobID)
+			GlobalScheduler.Stop(value.(string))
 			schedulerJobMap.Delete(key)
-			fmt.Printf("stopped scheduler job %s for workflow %s\n", jobID, workflowID)
+			fmt.Printf("stopped scheduler job %s for workflow %s\n", value.(string), workflowID)
 		}
 		return true
 	})
@@ -96,47 +95,69 @@ func buildTriggerFn(q *database.Queries, workflowID uuid.UUID) TriggerFn {
 			return
 		}
 
-		var nodes []rawNode
-		if err := json.Unmarshal(wf.Nodes, &nodes); err != nil {
-			fmt.Printf("scheduler: failed to parse nodes: %v\n", err)
+		meta, err := q.GetWorkflowMetadataByWorkflowId(ctx, workflowID)
+		if err != nil {
+			fmt.Printf("scheduler: failed to fetch metadata for workflow %s: %v\n", workflowID, err)
 			return
 		}
 
-		var edges []rawEdge
-		if err := json.Unmarshal(wf.Edges, &edges); err != nil {
+		var edges map[string][]string
+		var inDegree map[string]int
+
+		if err := unmarshalAny(meta.Edges, &edges); err != nil {
 			fmt.Printf("scheduler: failed to parse edges: %v\n", err)
 			return
 		}
 
-		dag := buildDAG(nodes, edges)
-
-		inDegree := make(map[string]int)
-		for id := range dag.Nodes {
-			inDegree[id] = 0
+		if err := unmarshalAny(meta.InDegree, &inDegree); err != nil {
+			fmt.Printf("scheduler: failed to parse in_degree: %v\n", err)
+			return
 		}
-		for _, children := range dag.Edges {
-			for _, child := range children {
-				inDegree[child]++
-			}
+
+		var rawNodes []Node
+		if err := unmarshalAny(wf.Nodes, &rawNodes); err != nil {
+			fmt.Printf("scheduler: failed to parse nodes: %v\n", err)
+			return
+		}
+
+		dag := &DAG{
+			Nodes:    make(map[string]Node),
+			Edges:    edges,
+			InDegree: make(map[string]int),
+		}
+		maps.Copy(dag.InDegree, inDegree)
+		for _, n := range rawNodes {
+			dag.Nodes[n.ID] = n
 		}
 
 		execCtx := &ExecutionContext{
 			WorkflowID: workflowID.String(),
 			Results:    make(map[string]any),
-			InDegree:   inDegree,
-			ReadyQueue: make(chan string, len(dag.Nodes)),
+			InDegree:   make(map[string]int),
 		}
+		maps.Copy(execCtx.InDegree, inDegree)
 
 		execCtx.Results[event.TriggerNodeID] = event.Input
 
-		tq := NewTaskQueue(len(dag.Nodes))
+		if err := ExecuteNode(ctx, event.TriggerNodeID, dag, execCtx); err != nil {
+			fmt.Printf("scheduler: failed to execute start node %s: %v\n", event.TriggerNodeID, err)
+			return
+		}
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		var mu sync.Mutex
+		errCh := make(chan error, 1)
+		tq := NewTaskQueue(100)
 
 		tq.StartWorkers(ctx, 4, func(ctx context.Context, nodeID string) error {
 			if err := ExecuteNode(ctx, nodeID, dag, execCtx); err != nil {
+				errCh <- err
+				cancel()
 				return err
 			}
 
-			var mu sync.Mutex
 			mu.Lock()
 			defer mu.Unlock()
 
@@ -149,32 +170,26 @@ func buildTriggerFn(q *database.Queries, workflowID uuid.UUID) TriggerFn {
 			return nil
 		})
 
-		tq.Enqueue(event.TriggerNodeID)
-		tq.Wait()
+		for _, child := range dag.Edges[event.TriggerNodeID] {
+			execCtx.InDegree[child]--
+			if execCtx.InDegree[child] == 0 {
+				tq.Enqueue(child)
+			}
+		}
 
-		fmt.Printf("scheduler: workflow %s execution complete\n", workflowID)
-	}
-}
+		done := make(chan struct{})
+		go func() {
+			tq.Wait()
+			close(done)
+		}()
 
-func buildDAG(nodes []rawNode, edges []rawEdge) *DAG {
-	dag := &DAG{
-		Nodes: make(map[string]Node),
-		Edges: make(map[string][]string),
-	}
-
-	for _, n := range nodes {
-		dag.Nodes[n.ID] = Node{
-			ID:   n.ID,
-			Type: n.Type,
-			Data: n.Data,
+		select {
+		case <-done:
+			fmt.Printf("scheduler: workflow %s execution complete\n", workflowID)
+		case err := <-errCh:
+			fmt.Printf("scheduler: workflow %s execution failed: %v\n", workflowID, err)
 		}
 	}
-
-	for _, e := range edges {
-		dag.Edges[e.Source] = append(dag.Edges[e.Source], e.Target)
-	}
-
-	return dag
 }
 
 func parseInterval(data map[string]any) (time.Duration, error) {

@@ -137,8 +137,8 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		StartNodes: startNodesJSON,
 	})
 	if err != nil {
-		tx.Rollback()
-		utils.RespondWithError(w, 500, fmt.Sprintf("Metadata save failed: %v", err))
+		rollbackErr := tx.Rollback()
+		utils.RespondWithError(w, 500, fmt.Sprintf("Metadata save failed: %v %v", err, rollbackErr))
 		return
 	}
 
@@ -152,8 +152,8 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:    time.Now().UTC(),
 	})
 	if err != nil {
-		tx.Rollback()
-		utils.RespondWithError(w, 400, fmt.Sprintf("Error updating the workflow: %v", err))
+		rollbackErr := tx.Rollback()
+		utils.RespondWithError(w, 400, fmt.Sprintf("Error updating the workflow: %v %v", err, rollbackErr))
 		return
 	}
 
