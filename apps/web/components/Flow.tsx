@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useEffect, useState } from "react";
 import ReactFlow, {
   Background,
@@ -19,7 +18,6 @@ import { Button } from "./ui/button";
 import { Circle } from "lucide-react";
 import ToolBar from "./ToolBar";
 import { useUser } from "@clerk/nextjs";
-
 import type {
   TriggerData,
   GeminiData,
@@ -27,6 +25,7 @@ import type {
   WebhookData,
   MergeData,
   SchedulerData,
+  ResendData,
 } from "./nodes/Nodes";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import {
@@ -37,17 +36,15 @@ import {
   DialogFooter,
 } from "./ui/dialog";
 import { Input } from "./ui/input";
-
 export type AppNodeData =
   | TriggerData
   | GeminiData
   | ShowOutputData
   | WebhookData
   | MergeData
-  | SchedulerData;
-
+  | SchedulerData
+  | ResendData;
 export type AppNode = Node<AppNodeData>;
-
 export default function Flow({
   saveAction,
   nds,
@@ -70,35 +67,28 @@ export default function Flow({
   wfName?: string;
 }) {
   const [status, setStatus] = useState<boolean>(false);
-
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [workflowName, setWorkflowName] = useState<string>("default");
   const { user } = useUser();
-
   const [isSaved, setIsSaved] = useState(true);
   const [lastSaved, setLastSaved] = useState<{
     nodes: Node<AppNodeData>[];
     edges: Edge[];
   } | null>(null);
-
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
   const [nameInput, setNameInput] = useState("");
-
   useEffect(() => {
     if (!lastSaved) {
       setIsSaved(false);
       return;
     }
-
     const nodesChanged =
       JSON.stringify(nodes) !== JSON.stringify(lastSaved.nodes);
     const edgesChanged =
       JSON.stringify(edges) !== JSON.stringify(lastSaved.edges);
-
     setIsSaved(!(nodesChanged || edgesChanged));
   }, [nodes, edges, lastSaved]);
-
   const handleSend = useCallback(
     (nodeId: string, payload: string) => {
       setNodes((nds) =>
@@ -117,15 +107,12 @@ export default function Flow({
     },
     [setNodes],
   );
-
   const onConnect = useCallback(
     (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges],
   );
-
   const nodesWithHandlers: Node<AppNodeData>[] = nodes.map((n) => {
     const baseData = (n.data ?? {}) as AppNodeData;
-
     if (n.type === "triggerManually") {
       return {
         ...n,
@@ -137,7 +124,6 @@ export default function Flow({
         } as AppNodeData,
       };
     }
-
     if (n.type === "geminiNode") {
       return {
         ...n,
@@ -148,7 +134,6 @@ export default function Flow({
         } as AppNodeData,
       };
     }
-
     if (n.type === "webhookNode") {
       return {
         ...n,
@@ -159,7 +144,6 @@ export default function Flow({
         },
       };
     }
-
     if (n.type === "schedulerNode") {
       return {
         ...n,
@@ -171,21 +155,26 @@ export default function Flow({
         } as AppNodeData,
       };
     }
-
+    if (n.type === "resendNode") {
+      return {
+        ...n,
+        data: {
+          ...baseData,
+          setNodes,
+        } as AppNodeData,
+      };
+    }
     return { ...n, data: baseData };
   });
-
   useEffect(() => {
     if (nds && nodes.length === 0) {
       setNodes(nds);
       setLastSaved({ nodes: nds, edges: egs ?? [] });
       setIsSaved(true);
     }
-
     if (egs && edges.length === 0) {
       setEdges(egs);
     }
-
     if (sts !== undefined) {
       setStatus(sts);
     }
@@ -193,20 +182,16 @@ export default function Flow({
       setWorkflowName(wfName);
     }
   }, [nds, egs, sts, wfName, edges.length, nodes.length, setNodes, setEdges]);
-
   const save = async () => {
     saveAction(nodesWithHandlers, edges, status, workflowName);
     setIsSaved(true);
   };
-
   const autoSave = useDebouncedCallback(save, 5000);
-
   useEffect(() => {
     if (workflowId) {
       autoSave();
     }
   }, [autoSave, nodesWithHandlers, edges, status, workflowId]);
-
   return (
     <div className="w-full h-full">
       <div className="bg-[#262626] rounded-md flex justify-between gap-4 items-center py-2 absolute z-10">
@@ -239,7 +224,6 @@ export default function Flow({
           >
             Save
           </Button>
-
           <Button
             disabled={!workflowId}
             onClick={async () => {
@@ -247,14 +231,11 @@ export default function Flow({
                 console.error("No workflowId provided");
                 return;
               }
-
               if (!user?.id) {
                 console.error("No user found");
                 return;
               }
-
               const newStatus = status ? "not-active" : "active";
-
               try {
                 const response = await fetch(
                   `${process.env.NEXT_PUBLIC_BACKEND_URL}/workflow/status`,
@@ -270,13 +251,11 @@ export default function Flow({
                     }),
                   },
                 );
-
                 if (!response.ok) {
                   const text = await response.text();
                   console.error("Failed to update workflow status:", text);
                   return;
                 }
-
                 setStatus((prev) => !prev);
               } catch (err) {
                 console.error("Status update error:", err);
@@ -287,7 +266,6 @@ export default function Flow({
           </Button>
         </div>
       </div>
-
       <Dialog
         open={nameDialogOpen}
         onOpenChange={(open) => setNameDialogOpen(open)}
@@ -331,7 +309,6 @@ export default function Flow({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <ReactFlow
         nodes={nodesWithHandlers}
         edges={edges}
@@ -349,7 +326,6 @@ export default function Flow({
             setNodes((prev: Node<AppNodeData>[]) => {
               const last = prev[prev.length - 1];
               const newId = last ? `${Number(last.id) + 1}` : "1";
-
               const template = nd as Partial<Node<AppNodeData>>;
               const newNode: Node<AppNodeData> = {
                 id: newId,
@@ -360,7 +336,6 @@ export default function Flow({
                 },
                 data: (template.data as AppNodeData) ?? ({} as AppNodeData),
               };
-
               return [...prev, newNode];
             });
           }}

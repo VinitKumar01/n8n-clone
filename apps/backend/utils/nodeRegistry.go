@@ -9,4 +9,5 @@ func RegisterNodes() {
 	NodeRegistry["webhookNode"] = ExecuteWebhookNode
 	NodeRegistry["mergeNode"] = ExecuteMergeNode
 	NodeRegistry["schedulerNode"] = ExecuteSchedulerNode
+	NodeRegistry["resendNode"] = ExecuteResendNode
 }

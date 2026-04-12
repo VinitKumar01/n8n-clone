@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Handle, Position, Node as RFNode } from "reactflow";
 import "reactflow/dist/style.css";
@@ -24,7 +23,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Button } from "../ui/button";
-import { MergeIcon, WebhookIcon } from "lucide-react";
+import { MergeIcon, WebhookIcon, MailIcon } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import GeminiIcon from "@/app/icons/GeminiIcon";
 import {
@@ -37,48 +36,38 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
-
 import type { Dispatch, SetStateAction } from "react";
 import type { AppNodeData } from "../Flow";
-
 export type NodePayload = unknown;
 export type OnSend = (nodeId: string, payload: NodePayload) => void;
-
 type MutableNodeData<T> = T & { [key: string]: unknown };
-
 export type TriggerData = MutableNodeData<{
   onSend?: OnSend;
   workflowId: string;
   received?: NodePayload;
   status: boolean;
 }>;
-
 export type WebhookData = MutableNodeData<{
   workflowId?: string;
   status?: boolean;
 }>;
-
 export type GeminiInputs = {
   apiKey?: string;
   model?: string;
   prompt?: string;
 };
-
 export type GeminiData = MutableNodeData<{
   inputs?: GeminiInputs;
   onSend?: OnSend;
   received?: NodePayload;
   setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
 }>;
-
 export type ShowOutputData = MutableNodeData<{
   received?: NodePayload;
 }>;
-
 export type MergeData = MutableNodeData<{
   received?: NodePayload;
 }>;
-
 export type SchedulerData = MutableNodeData<{
   inputs?: {
     interval?: string;
@@ -87,11 +76,20 @@ export type SchedulerData = MutableNodeData<{
   status?: boolean;
   setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
 }>;
-
+export type ResendInputs = {
+  apiKey?: string;
+  from?: string;
+  to?: string;
+  subject?: string;
+};
+export type ResendData = MutableNodeData<{
+  inputs?: ResendInputs;
+  received?: NodePayload;
+  setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
+}>;
 function isString(v: unknown): v is string {
   return typeof v === "string";
 }
-
 function prettyPrintPayload(p: NodePayload): string {
   if (p === null || p === undefined) return "<no output yet>";
   if (isString(p)) return p;
@@ -101,7 +99,6 @@ function prettyPrintPayload(p: NodePayload): string {
     return String(p);
   }
 }
-
 export function TriggerManually({
   id,
   data,
@@ -111,16 +108,13 @@ export function TriggerManually({
 }) {
   const status = data.status;
   const { user } = useUser();
-
   const executeNode = useCallback(async () => {
     if (!data.workflowId || !status) {
       return;
     }
-
     try {
       const myHeaders = new Headers();
       myHeaders.append("Content-Type", "application/json");
-
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/workflow/${data.workflowId}/execute`,
         {
@@ -133,19 +127,15 @@ export function TriggerManually({
           redirect: "follow",
         },
       );
-
       if (!response.ok) {
         const text = await response.text();
         console.error("Failed to execute workflow:", response.status, text);
         return;
       }
-
       const body = (await response.json()) as {
         results?: Record<string, NodePayload>;
       };
-
       const results = body.results ?? {};
-
       Object.entries(results).forEach(([nodeId, payload]) => {
         try {
           data.onSend?.(nodeId, payload);
@@ -157,7 +147,6 @@ export function TriggerManually({
       console.error("Error executing workflow:", err);
     }
   }, [id, data, user?.id, status]);
-
   const TriggerContent = (
     <div
       className="border p-4 bg-[#262626] rounded-2xl cursor-pointer"
@@ -170,7 +159,6 @@ export function TriggerManually({
       <Handle type="source" position={Position.Right} />
     </div>
   );
-
   if (!data.workflowId || !status) {
     return (
       <AlertDialog>
@@ -190,14 +178,11 @@ export function TriggerManually({
       </AlertDialog>
     );
   }
-
   return TriggerContent;
 }
-
 export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
   const promptRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
-
   const [prompt, setPrompt] = useState<string | undefined>(
     (data.inputs as GeminiInputs | undefined)?.prompt,
   );
@@ -207,17 +192,14 @@ export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
   const [model, setModel] = useState<string>(
     (data.inputs as GeminiInputs | undefined)?.model ?? "gemini-2.5-flash",
   );
-
   const [output, setOutput] = useState<NodePayload | null>(
     (data.received as NodePayload) ?? null,
   );
-
   useEffect(() => {
     if (data.received !== undefined) {
       setOutput(data.received as NodePayload);
     }
   }, [data.received]);
-
   return (
     <div className="bg-[#262626] p-4 rounded-2xl">
       <Dialog>
@@ -241,7 +223,6 @@ export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
               workflow.
             </DialogDescription>
           </DialogHeader>
-
           <div className="flex flex-col justify-center items-center gap-4 p-4 rounded-2xl">
             <input
               ref={promptRef}
@@ -272,15 +253,12 @@ export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
                 </SelectGroup>
               </SelectContent>
             </Select>
-
             <Button
               onClick={() => {
                 const newApiKey = apiKeyRef.current?.value ?? "";
                 const newPrompt = promptRef.current?.value ?? "";
-
                 setApiKey(newApiKey);
                 setPrompt(newPrompt);
-
                 data.setNodes?.((nds) =>
                   nds.map((node) =>
                     node.id === id
@@ -305,7 +283,6 @@ export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
           </div>
         </DialogContent>
       </Dialog>
-
       <div className="mt-2">
         <div className="text-xs text-muted-foreground mb-2">
           Configured prompt
@@ -314,23 +291,19 @@ export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
           {prompt ?? "<not configured>"}
         </pre>
       </div>
-
       <div className="mt-3">
         <div className="text-xs text-muted-foreground mb-1">Output</div>
         <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
           {output ? prettyPrintPayload(output) : "<no output yet>"}
         </pre>
       </div>
-
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
     </div>
   );
 }
-
 export function ShowOutput({ data }: { data: ShowOutputData }) {
   const payload = data.received;
-
   return (
     <div className="p-2 border rounded-2xl bg-[#262626]">
       <div>Show Output</div>
@@ -341,58 +314,46 @@ export function ShowOutput({ data }: { data: ShowOutputData }) {
     </div>
   );
 }
-
 export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
   const status = data.status;
   const workflowId = data.workflowId;
-
   const [url, setUrl] = useState<string>("");
-
   useEffect(() => {
     const base = process.env.NEXT_PUBLIC_BACKEND_URL;
-
     if (workflowId) {
       setUrl(`${base}/webhook/${workflowId}/${id}`);
     } else {
       setUrl(`${base}/webhook/<workflowId>/${id}`);
     }
   }, [workflowId, id]);
-
   const NodeBody = (
     <div className="bg-[#262626] p-4 rounded-2xl cursor-pointer">
       <div className="flex justify-center w-full">
         <WebhookIcon />
       </div>
-
       <div className="mt-2">
         <div className="text-xs text-muted-foreground mb-1">
           Webhook trigger
         </div>
-
         <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
           POST
         </pre>
       </div>
-
       <Handle type="source" position={Position.Right} />
     </div>
   );
-
   if (!workflowId || !status) {
     return (
       <AlertDialog>
         <AlertDialogTrigger asChild>{NodeBody}</AlertDialogTrigger>
-
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Webhook not available</AlertDialogTitle>
-
             <AlertDialogDescription>
               Webhooks can only be used when the workflow is saved and
               activated.
             </AlertDialogDescription>
           </AlertDialogHeader>
-
           <AlertDialogFooter>
             <AlertDialogAction>Okay</AlertDialogAction>
           </AlertDialogFooter>
@@ -400,11 +361,9 @@ export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
       </AlertDialog>
     );
   }
-
   return (
     <Dialog>
       <DialogTrigger asChild>{NodeBody}</DialogTrigger>
-
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Webhook Node</DialogTitle>
@@ -412,14 +371,11 @@ export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
             Send a POST request to the URL below to trigger this workflow.
           </DialogDescription>
         </DialogHeader>
-
         <div className="flex flex-col gap-4 p-4">
           <div className="text-xs text-muted-foreground">Webhook URL</div>
-
           <pre className="text-xs bg-[#111] p-2 rounded text-wrap break-all">
             {url}
           </pre>
-
           <Button onClick={() => navigator.clipboard.writeText(url)}>
             Copy URL
           </Button>
@@ -428,17 +384,14 @@ export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
     </Dialog>
   );
 }
-
 export function MergeNode({ data }: { data: MergeData }) {
   const payload = data.received;
-
   return (
     <div className="p-2 border rounded-2xl bg-[#262626]">
       <div className="flex justify-center items-center p-4 gap-2">
         <MergeIcon />
         <div>Merge</div>
       </div>
-
       <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
         {payload ? prettyPrintPayload(payload) : ""}
       </pre>
@@ -447,7 +400,6 @@ export function MergeNode({ data }: { data: MergeData }) {
     </div>
   );
 }
-
 export function SchedulerNode({
   id,
   data,
@@ -463,7 +415,6 @@ export function SchedulerNode({
   );
   const status = data.status;
   const workflowId = data.workflowId;
-
   const NodeBody = (
     <div className="bg-[#262626] p-4 rounded-2xl cursor-pointer min-w-[160px]">
       <div className="flex justify-center w-full mb-2">
@@ -489,7 +440,6 @@ export function SchedulerNode({
       <Handle type="source" position={Position.Right} />
     </div>
   );
-
   if (!workflowId || !status) {
     return (
       <AlertDialog>
@@ -508,7 +458,6 @@ export function SchedulerNode({
       </AlertDialog>
     );
   }
-
   return (
     <Dialog>
       <DialogTrigger asChild>{NodeBody}</DialogTrigger>
@@ -554,7 +503,128 @@ export function SchedulerNode({
     </Dialog>
   );
 }
-
+export function ResendNode({ id, data }: { id: string; data: ResendData }) {
+  const apiKeyRef = useRef<HTMLInputElement>(null);
+  const fromRef = useRef<HTMLInputElement>(null);
+  const toRef = useRef<HTMLInputElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const [to, setTo] = useState<string | undefined>(
+    (data.inputs as ResendInputs | undefined)?.to,
+  );
+  const [subject, setSubject] = useState<string | undefined>(
+    (data.inputs as ResendInputs | undefined)?.subject,
+  );
+  const [output, setOutput] = useState<NodePayload | null>(
+    (data.received as NodePayload) ?? null,
+  );
+  useEffect(() => {
+    if (data.received !== undefined) {
+      setOutput(data.received as NodePayload);
+    }
+  }, [data.received]);
+  return (
+    <div className="bg-[#262626] p-4 rounded-2xl">
+      <Dialog>
+        <DialogTrigger className="flex justify-center items-center w-full">
+          <MailIcon size={28} />
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resend Email Node</DialogTitle>
+            <DialogTrigger className="flex justify-start">
+              <pre>To get Resend api-key visit: </pre>
+              <Link
+                href={"https://resend.com/api-keys"}
+                className="text-blue-500"
+              >
+                Resend Dashboard
+              </Link>
+            </DialogTrigger>
+            <DialogDescription>
+              These options will be used when this node is triggered by the
+              workflow.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col justify-center items-center gap-4 p-4 rounded-2xl">
+            <input
+              ref={apiKeyRef}
+              placeholder="Resend API Key"
+              className="border border-dashed border-white rounded-md p-2 w-full"
+              defaultValue={(data.inputs as ResendInputs | undefined)?.apiKey}
+            />
+            <input
+              ref={fromRef}
+              placeholder="From (e.g. you@yourdomain.com)"
+              className="border border-dashed border-white rounded-md p-2 w-full"
+              defaultValue={(data.inputs as ResendInputs | undefined)?.from}
+            />
+            <input
+              ref={toRef}
+              placeholder="To (recipient email)"
+              className="border border-dashed border-white rounded-md p-2 w-full"
+              defaultValue={to}
+            />
+            <input
+              ref={subjectRef}
+              placeholder="Subject"
+              className="border border-dashed border-white rounded-md p-2 w-full"
+              defaultValue={subject}
+            />
+            <Button
+              onClick={() => {
+                const newApiKey = apiKeyRef.current?.value ?? "";
+                const newFrom = fromRef.current?.value ?? "";
+                const newTo = toRef.current?.value ?? "";
+                const newSubject = subjectRef.current?.value ?? "";
+                setTo(newTo);
+                setSubject(newSubject);
+                data.setNodes?.((nds: RFNode<AppNodeData>[]) =>
+                  nds.map((node) =>
+                    node.id === id
+                      ? {
+                          ...node,
+                          data: {
+                            ...node.data,
+                            inputs: {
+                              apiKey: newApiKey,
+                              from: newFrom,
+                              to: newTo,
+                              subject: newSubject,
+                            },
+                          },
+                        }
+                      : node,
+                  ),
+                );
+              }}
+            >
+              Save values
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <div className="mt-2">
+        <div className="text-xs text-muted-foreground mb-2">Sending to</div>
+        <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
+          {to ?? "<not configured>"}
+        </pre>
+      </div>
+      <div className="mt-2">
+        <div className="text-xs text-muted-foreground mb-2">Subject</div>
+        <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
+          {subject ?? "<not configured>"}
+        </pre>
+      </div>
+      <div className="mt-3">
+        <div className="text-xs text-muted-foreground mb-1">Last send</div>
+        <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
+          {output ? prettyPrintPayload(output) : "<not sent yet>"}
+        </pre>
+      </div>
+      <Handle type="target" position={Position.Left} />
+    </div>
+  );
+}
 export const nodeTypes = {
   triggerManually: TriggerManually,
   geminiNode: GeminiNode,
@@ -562,8 +632,8 @@ export const nodeTypes = {
   webhookNode: WebhookNode,
   mergeNode: MergeNode,
   schedulerNode: SchedulerNode,
+  resendNode: ResendNode,
 };
-
 export const nodes = [
   {
     name: "Gemini",
@@ -651,6 +721,18 @@ export const nodes = [
             <polyline points="12 6 12 12 16 14" />
           </svg>
           <div className="text-xs font-semibold">Scheduler</div>
+        </div>
+      );
+    },
+  },
+  {
+    name: "Email",
+    type: "resendNode",
+    component: () => {
+      return (
+        <div className="h-full bg-[#262626] p-4 rounded-2xl flex flex-col justify-center items-center gap-1">
+          <MailIcon size={28} />
+          <div className="text-xs font-semibold">Email</div>
         </div>
       );
     },
