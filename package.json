@@ -1,6 +1,7 @@
 {
   "name": "n8n-clone",
   "private": true,
+  "packageManager": "bun@1.2.13",
   "scripts": {
     "dev": "turbo run dev --parallel",
     "dev:web": "turbo run dev --filter=web",
