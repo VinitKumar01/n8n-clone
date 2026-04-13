@@ -16,7 +16,11 @@ type Workflow = {
   user_id: string;
 };
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL!;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+if (!BACKEND_URL) {
+  throw new Error("NEXT_PUBLIC_BACKEND_URL is missing");
+}
 
 export async function getWorkflows(userId: string): Promise<Workflow[]> {
   const response = await axios.get(BACKEND_URL + `/workflows/${userId}`);

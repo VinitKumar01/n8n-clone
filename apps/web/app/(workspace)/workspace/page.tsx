@@ -6,7 +6,11 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 import { Node, Edge } from "reactflow";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL!;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+if (!BACKEND_URL) {
+  throw new Error("NEXT_PUBLIC_BACKEND_URL is missing");
+}
 
 export default function Home() {
   const { user } = useUser();

@@ -7,7 +7,11 @@ import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { Edge, Node } from "reactflow";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL!;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+if (!BACKEND_URL) {
+  throw new Error("NEXT_PUBLIC_BACKEND_URL is missing");
+}
 
 export default function MyWorkflowsPage({
   params,

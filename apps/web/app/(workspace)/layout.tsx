@@ -1,19 +1,18 @@
 import "reactflow/dist/style.css";
 import "../globals.css";
-
 import { ThemeProvider } from "@/components/theme-provider";
 import { ClerkProvider } from "@clerk/nextjs";
 import NodesBar from "@/components/NodesBar";
 import { auth } from "@clerk/nextjs/server";
-
 import { DM_Serif_Display, IBM_Plex_Mono } from "next/font/google";
+
+export const dynamic = "force-dynamic";
 
 const dmSerif = DM_Serif_Display({
   subsets: ["latin"],
   weight: "400",
   variable: "--font-display",
 });
-
 const ibmMono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
@@ -22,12 +21,10 @@ const ibmMono = IBM_Plex_Mono({
 
 export default async function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  const { isAuthenticated, redirectToSignIn } = await auth();
+}: Readonly<{ children: React.ReactNode }>) {
+  const { userId, redirectToSignIn } = await auth();
 
-  if (!isAuthenticated) {
+  if (!userId) {
     return redirectToSignIn();
   }
 
