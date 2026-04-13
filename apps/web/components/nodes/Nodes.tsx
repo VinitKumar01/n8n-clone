@@ -25,7 +25,7 @@ import {
 import { Button } from "../ui/button";
 import { MergeIcon, WebhookIcon, MailIcon } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-import GeminiIcon from "@/app/icons/GeminiIcon";
+import GeminiIcon from "@/icons/GeminiIcon";
 import {
   AlertDialog,
   AlertDialogAction,

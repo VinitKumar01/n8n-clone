@@ -1,40 +1,43 @@
-import type { Metadata } from "next";
-import { Crimson_Text } from "next/font/google";
-import "reactflow/dist/style.css";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
-import { ThemeProvider } from "../components/theme-provider";
 import { ClerkProvider } from "@clerk/nextjs";
-import NodesBar from "@/components/NodesBar";
+import type { Metadata } from "next";
+import { DM_Serif_Display, IBM_Plex_Mono } from "next/font/google";
 
-const crimson = Crimson_Text({
+const dmSerif = DM_Serif_Display({
   subsets: ["latin"],
-  weight: ["400", "600", "700"],
-  variable: "--font-crimson",
+  weight: "400",
+  variable: "--font-display",
+});
+
+const ibmMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
-  title: "The Go based automation tool",
-  description: "This is a performent alternate to n8n/zapier",
+  title: "g8g — Go based Visual Workflow Automation",
+  description:
+    "Build, schedule, and automate workflows visually. Connect AI, webhooks, and email into powerful pipelines.",
 };
 
-export default function RootLayout({
+export default function LandingLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
-        <body className={`${crimson.variable} antialiased`}>
+        <body className={`${dmSerif.variable} ${ibmMono.variable} antialiased`}>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >
-            <div className="h-screen flex justify-start w-full">
-              <NodesBar> {children}</NodesBar>
-            </div>
+            <div className="h-screen w-full">{children}</div>
           </ThemeProvider>
         </body>
       </html>
