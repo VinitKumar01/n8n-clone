@@ -19,20 +19,16 @@ import (
 )
 
 func main() {
-	err := godotenv.Load("./.env")
-	if err != nil {
-		fmt.Printf("Error while loading envs: %v", err)
-		return
+	if os.Getenv("RENDER") == "" {
+		_ = godotenv.Load()
 	}
 
 	port := os.Getenv("PORT")
-
 	if port == "" {
-		log.Fatal("PORT not found in env")
+		port = "8080"
 	}
 
 	dbUrl := os.Getenv("DB_URL")
-
 	if dbUrl == "" {
 		log.Fatal("DB_URL not found in env")
 	}
@@ -42,6 +38,10 @@ func main() {
 		log.Fatal("Database connection failed:", err)
 	}
 
+	if err := conn.Ping(); err != nil {
+		log.Fatal("Database not reachable:", err)
+	}
+
 	queries := database.New(conn)
 	db := routes.Db{
 		DB:      conn,
@@ -49,14 +49,13 @@ func main() {
 	}
 
 	router := chi.NewRouter()
+
 	router.Use(cors.Handler(cors.Options{
-		// AllowedOrigins: []string{"https://foo.com"}, // Use this to allow specific origin hosts
-		AllowedOrigins:   []string{"https://*", "http://*"}, // Allows requests from any origin (development setting)
+		AllowedOrigins:   []string{"*"}, // tighten later in prod if needed
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300, // Maximum value for Access-Control-Max-Age header
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowCredentials: false,
+		MaxAge:           300,
 	}))
 
 	v1Router := chi.NewRouter()
@@ -75,25 +74,22 @@ func main() {
 
 	srv := &http.Server{
 		Handler: router,
-		Addr:    ":" + port,
+		Addr:    "0.0.0.0:" + port,
 	}
 
-	fmt.Printf("Server starting at port %s\n", port)
+	fmt.Printf("🚀 Server running on port %s\n", port)
 
 	utils.RegisterNodes()
 
-	err = utils.RegisterWebhooks(context.Background(), db.Queries)
-	if err != nil {
+	if err := utils.RegisterWebhooks(context.Background(), db.Queries); err != nil {
 		log.Fatal(err)
 	}
 
-	err = utils.RegisterSchedulers(context.Background(), db.Queries)
-	if err != nil {
+	if err := utils.RegisterSchedulers(context.Background(), db.Queries); err != nil {
 		log.Fatal(err)
 	}
 
-	err = srv.ListenAndServe()
-	if err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }

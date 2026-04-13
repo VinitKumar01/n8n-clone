@@ -15,7 +15,7 @@ GOOSE_VERSION := $(shell go list -m -f '{{.Version}}' $(GOOSE_MOD) 2>/dev/null |
 
 # DB (override on CLI: make migrate-up DB_STRING="postgres://user:pass@host/db?sslmode=disable")
 DB_DRIVER ?= postgres
-DB_STRING ?= user=postgres dbname=mydb sslmode=disable
+DB_STRING ?= $(DATABASE_URL)
 
 # Ensure go.mod contains your tools
 tools:

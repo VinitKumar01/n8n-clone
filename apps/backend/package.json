@@ -1,11 +1,11 @@
 {
   "name": "backend",
-  "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "go run .",
-    "build": "go build",
-    "start": "go build && ./main",
-    "lint": "eslint"
+    "dev": "air || go run .",
+    "build": "go build -o bin/server",
+    "start": "./bin/server",
+    "migrate": "make migrate-up",
+    "sqlc": "make sqlc"
   }
 }
