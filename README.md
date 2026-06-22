@@ -1,135 +1,102 @@
-# Turborepo starter
+# n8n-clone
 
-This Turborepo starter is maintained by the Turborepo core team.
+An open-source workflow automation tool built with Turborepo, Next.js, and Go, heavily inspired by n8n.
 
-## Using this example
+## Prerequisites
 
-Run the following command:
+Before you begin, ensure you have the following installed:
 
-```sh
-npx create-turbo@latest
+- [Bun](https://bun.sh/) (Package manager used for this project)
+- [Go](https://golang.org/)
+- [Docker](https://www.docker.com/) (For running PostgreSQL locally)
+- [ngrok](https://ngrok.com/) (For webhook testing with Clerk)
+
+## Environment Variables
+
+Create `.env` files in both the frontend and backend applications using the following configurations.
+
+### Backend (`apps/backend/.env`)
+
+```env
+PORT=8080
+DB_URL="postgres://postgres:mypassword@localhost:5432/n8n-clone?sslmode=disable"
+# Get this from your Clerk Dashboard > Webhooks
+CLERK_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 ```
 
-## What's inside?
+### Frontend (`apps/web/.env`)
 
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+```env
+# Get these from your Clerk Dashboard > API Keys
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_BACKEND_URL="http://localhost:8080/v1"
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+### How to get Clerk credentials
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+1. Create an account on [Clerk](https://clerk.com/) and set up a new application.
+2. Go to **API Keys** to get your `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
+3. To get the `CLERK_WEBHOOK_SECRET`, go to **Webhooks**, add an endpoint pointing to your ngrok URL (`https://<your-ngrok-id>.ngrok-free.app/v1/clerk/webhook`), and copy the signing secret.
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+## Local Setup Instructions
 
-### Develop
+1. **Start the PostgreSQL database via Docker:**
 
-To develop all apps and packages, run the following command:
+   ```sh
+   docker run --name n8n-postgres -e POSTGRES_PASSWORD=mypassword -e POSTGRES_DB=n8n-clone -p 5432:5432 -d postgres
+   ```
 
-```
-cd my-turborepo
+   _Note: If you want to use a different database, make sure to update the `DB_URL` in your backend `.env` accordingly._
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
+2. **Expose your local backend using ngrok (for Clerk Webhooks):**
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
+   ```sh
+   ngrok http 8080
+   ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+   _Note: Keep this running in the background and update your Clerk Webhook URL with the forwarded HTTPS address._
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
+3. **Install dependencies:**
+   From the root of the monorepo:
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
+   ```sh
+   bun install
+   ```
 
-### Remote Caching
+4. **Run database migrations:**
+   Before starting the backend, you need to apply the database schema. Navigate to the backend directory and run the migration command:
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+   ```sh
+   cd apps/backend
+   make migrate-up
+   cd ../..
+   ```
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+5. **Run the project (Turborepo):**
+   To start both the frontend and backend concurrently:
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+   ```sh
+   bun run dev
+   ```
 
-```
-cd my-turborepo
+   Alternatively, you can run them individually:
+   - Frontend only: `bun run dev:web`
+   - Backend only: `bun run dev:backend`
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
+## Available Nodes
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
+The platform currently supports the following automation nodes:
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+- **Manual Trigger**: Triggers the workflow manually from the UI.
+- **Webhook**: Triggers the workflow when an external HTTP request is received.
+- **Scheduler**: Triggers workflows periodically on a defined schedule.
+- **Gemini AI**: Interfaces with Google's Gemini AI to generate text based on prompts (Requires a Gemini API Key).
+- **Resend**: Sends emails programmatically using the Resend API (Requires a Resend API Key).
+- **Merge**: Merges multiple branch inputs into a single output string.
+- **Show Output**: A utility node that outputs the data it receives.
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+## Important Setup Notes
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+- **Webhooks:** Because the backend relies on Clerk for user authentication events (like user creation), it's crucial to have `ngrok` running and the Clerk webhook properly configured with your ngrok URL. Without it, user synchronization won't work locally.
+- **Database Migrations:** The `Makefile` in `apps/backend/` handles database migrations using Goose. You can use `make new-migration NAME=...` to create new migrations and `make migrate-up` to apply them.
