@@ -6,18 +6,7 @@ import (
 	"google.golang.org/genai"
 )
 
-func GetGeminiResponse(ctx context.Context, args map[string]any, prevResult any) (any, error) {
-	prompt := AnyToString(args["prompt"])
-	if prevResult != nil {
-		prev := AnyToString(prevResult)
-		prompt = prompt + "/n" + prev
-	}
-	apiKey := AnyToString(args["apiKey"])
-	model := AnyToString(args["model"])
-	return gemini(ctx, prompt, apiKey, model)
-}
-
-func gemini(ctx context.Context, prompt string, apiKey string, model string) (string, error) {
+var geminiFunc = func(ctx context.Context, prompt string, apiKey string, model string) (string, error) {
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
 	if err != nil {
 		return "", err
@@ -34,4 +23,15 @@ func gemini(ctx context.Context, prompt string, apiKey string, model string) (st
 	}
 
 	return result.Text(), nil
+}
+
+func GetGeminiResponse(ctx context.Context, args map[string]any, prevResult any) (any, error) {
+	prompt := AnyToString(args["prompt"])
+	if prevResult != nil {
+		prev := AnyToString(prevResult)
+		prompt = prompt + "/n" + prev
+	}
+	apiKey := AnyToString(args["apiKey"])
+	model := AnyToString(args["model"])
+	return geminiFunc(ctx, prompt, apiKey, model)
 }

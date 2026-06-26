@@ -53,7 +53,10 @@ func (db Db) HandlerWorkflowStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	qtx := db.Queries.WithTx(tx)
+	var qtx database.Querier = db.Queries
+	if concreteQueries, ok := db.Queries.(*database.Queries); ok {
+		qtx = concreteQueries.WithTx(tx)
+	}
 
 	_, err = qtx.UpdateWorkflowStatusById(r.Context(), database.UpdateWorkflowStatusByIdParams{
 		ID:        workflow.ID,

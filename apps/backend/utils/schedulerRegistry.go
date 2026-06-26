@@ -31,7 +31,7 @@ func unmarshalAny(raw any, dest any) error {
 	}
 }
 
-func RegisterSchedulers(ctx context.Context, q *database.Queries) error {
+func RegisterSchedulers(ctx context.Context, q database.Querier) error {
 	workflows, err := q.GetActiveWorkflows(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch active workflows: %w", err)
@@ -87,7 +87,7 @@ func StopWorkflowSchedulers(workflowID uuid.UUID) {
 	})
 }
 
-func buildTriggerFn(q *database.Queries, workflowID uuid.UUID) TriggerFn {
+func buildTriggerFn(q database.Querier, workflowID uuid.UUID) TriggerFn {
 	return func(ctx context.Context, event TriggerEvent) {
 		wf, err := q.GetWorkflowById(ctx, workflowID)
 		if err != nil {

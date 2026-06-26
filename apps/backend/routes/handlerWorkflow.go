@@ -128,7 +128,10 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	qtx := db.Queries.WithTx(tx)
+	var qtx database.Querier = db.Queries
+	if concreteQueries, ok := db.Queries.(*database.Queries); ok {
+		qtx = concreteQueries.WithTx(tx)
+	}
 
 	err = qtx.UpsertWorkflowMetadata(r.Context(), database.UpsertWorkflowMetadataParams{
 		WorkflowID: params.WorkflowId,

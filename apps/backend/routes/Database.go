@@ -8,5 +8,5 @@ import (
 
 type Db struct {
 	DB      *sql.DB
-	Queries *database.Queries
+	Queries database.Querier
 }
