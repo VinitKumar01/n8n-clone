@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -173,7 +174,7 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		if err := utils.RegisterWebhooksForWorkflow(workflow.ID, workflow.Nodes); err != nil {
 			fmt.Printf("failed to re-register webhooks for active workflow %s: %v\n", workflow.ID, err)
 		}
-		if err := utils.RegisterSchedulersForWorkflow(r.Context(), db.Queries, workflow.ID, workflow.Nodes, workflow.Status); err != nil {
+		if err := utils.RegisterSchedulersForWorkflow(context.Background(), db.Queries, workflow.ID, workflow.Nodes, workflow.Status); err != nil {
 			fmt.Printf("failed to re-register schedulers for active workflow %s: %v\n", workflow.ID, err)
 		}
 	}

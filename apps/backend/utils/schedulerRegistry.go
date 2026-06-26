@@ -176,7 +176,12 @@ func buildTriggerFn(q database.Querier, workflowID uuid.UUID) TriggerFn {
 		}
 		maps.Copy(execCtx.InDegree, inDegree)
 
-		execCtx.Results[event.TriggerNodeID] = event.Input
+		inputCopy := make(map[string]any)
+		if event.Input != nil {
+			maps.Copy(inputCopy, event.Input)
+		}
+		inputCopy["triggeredAt"] = time.Now().UTC()
+		execCtx.Results[event.TriggerNodeID] = inputCopy
 
 		if err := ExecuteNode(ctx, event.TriggerNodeID, dag, execCtx); err != nil {
 			fmt.Printf("scheduler: failed to execute start node %s: %v\n", event.TriggerNodeID, err)

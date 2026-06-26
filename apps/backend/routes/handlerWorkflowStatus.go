@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -84,7 +85,7 @@ func (db Db) HandlerWorkflowStatus(w http.ResponseWriter, r *http.Request) {
 			utils.RespondWithError(w, 500, fmt.Sprintf("Webhook registration failed: %v", err))
 			return
 		}
-		if err := utils.RegisterSchedulersForWorkflow(r.Context(), db.Queries, workflow.ID, workflow.Nodes, database.WorkflowStatusActive); err != nil {
+		if err := utils.RegisterSchedulersForWorkflow(context.Background(), db.Queries, workflow.ID, workflow.Nodes, database.WorkflowStatusActive); err != nil {
 			utils.RespondWithError(w, 500, fmt.Sprintf("Scheduler registration failed: %v", err))
 			return
 		}
