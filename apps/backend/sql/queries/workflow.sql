@@ -15,3 +15,7 @@ UPDATE workflow SET status = $1, updated_at = $2 WHERE id = $3 AND user_id = $4 
 
 -- name: GetActiveWorkflows :many
 SELECT * FROM workflow WHERE status = 'active';
+
+-- name: DeleteWorkflowById :exec
+DELETE FROM workflow WHERE id = $1 AND user_id = $2;
+

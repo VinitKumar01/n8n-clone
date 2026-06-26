@@ -64,11 +64,13 @@ func main() {
 	v1Router.Post("/workflow", db.HandlerCreateWorkflow)
 	v1Router.Put("/workflow", db.HandlerUpdateWorkflow)
 	v1Router.Get("/workflow/{workflowId}", db.HandlerGetWorkflowById)
+	v1Router.Delete("/workflow/{workflowId}", db.HandlerDeleteWorkflow)
 	v1Router.Post("/workflow/{workflowId}/execute", db.HandlerWorkflowExecute)
 	v1Router.Get("/workflows/{userId}", db.HandlerGetWorkflowsByUserId)
 	v1Router.Post("/workflow/status", db.HandlerWorkflowStatus)
 	v1Router.Post("/clerk/webhook", db.HandlerClerkWebhook)
 	v1Router.Post("/webhook/{workflowID}/{nodeID}", db.HandlerWorkflowWebhook)
+
 
 	router.Mount("/v1", v1Router)
 

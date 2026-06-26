@@ -2,7 +2,7 @@
   "name": "backend",
   "private": true,
   "scripts": {
-    "dev": "air || go run .",
+    "dev": "go run .",
     "build": "go build -o bin/server",
     "start": "./bin/server",
     "migrate": "make migrate-up",

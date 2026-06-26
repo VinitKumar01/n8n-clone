@@ -1,11 +1,9 @@
 package routes
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -73,18 +71,22 @@ func (db Db) HandlerWorkflowStatus(w http.ResponseWriter, r *http.Request) {
 
 	committed = true
 
-	err = utils.RegisterWebhooks(context.Background(), db.Queries)
-	if err != nil {
-		utils.RespondWithError(w, 500, "Webhook registration failed")
-		return
-	}
+	// Stop existing webhooks and schedulers
+	utils.UnregisterWebhooksForWorkflow(workflow.ID)
+	utils.StopWorkflowSchedulers(workflow.ID)
 
-	utils.StopWorkflowSchedulers(params.WorkflowID)
-
-	err = utils.RegisterSchedulers(context.Background(), db.Queries)
-	if err != nil {
-		log.Fatal(err)
+	// If the workflow is active, register them again
+	if params.Status == utils.WorkflowStatusActive {
+		if err := utils.RegisterWebhooksForWorkflow(workflow.ID, workflow.Nodes); err != nil {
+			utils.RespondWithError(w, 500, fmt.Sprintf("Webhook registration failed: %v", err))
+			return
+		}
+		if err := utils.RegisterSchedulersForWorkflow(r.Context(), db.Queries, workflow.ID, workflow.Nodes, database.WorkflowStatusActive); err != nil {
+			utils.RespondWithError(w, 500, fmt.Sprintf("Scheduler registration failed: %v", err))
+			return
+		}
 	}
 
 	utils.RespondWithJson(w, 200, "workflow status updated")
 }
+

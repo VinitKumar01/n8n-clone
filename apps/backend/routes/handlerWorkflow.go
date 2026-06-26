@@ -162,6 +162,19 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Re-register active webhooks and schedulers to pick up any node/edge/interval edits
+	utils.UnregisterWebhooksForWorkflow(workflow.ID)
+	utils.StopWorkflowSchedulers(workflow.ID)
+
+	if workflow.Status == database.WorkflowStatusActive {
+		if err := utils.RegisterWebhooksForWorkflow(workflow.ID, workflow.Nodes); err != nil {
+			fmt.Printf("failed to re-register webhooks for active workflow %s: %v\n", workflow.ID, err)
+		}
+		if err := utils.RegisterSchedulersForWorkflow(r.Context(), db.Queries, workflow.ID, workflow.Nodes, workflow.Status); err != nil {
+			fmt.Printf("failed to re-register schedulers for active workflow %s: %v\n", workflow.ID, err)
+		}
+	}
+
 	utils.RespondWithJson(w, 201, utils.DatabaseWorkflowToWorkflow(workflow))
 }
 
@@ -176,3 +189,34 @@ func (db Db) HandlerGetWorkflowsByUserId(w http.ResponseWriter, r *http.Request)
 
 	utils.RespondWithJson(w, 200, utils.DatabaseWorkflowsToWorkflows(workflows))
 }
+
+func (db Db) HandlerDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
+	workflowIdString := chi.URLParam(r, "workflowId")
+	workflowId, err := uuid.Parse(workflowIdString)
+	if err != nil {
+		utils.RespondWithError(w, 400, fmt.Sprintf("Invalid workflow id: %v", err))
+		return
+	}
+
+	userId := r.URL.Query().Get("userId")
+	if userId == "" {
+		utils.RespondWithError(w, 400, "Missing userId query parameter")
+		return
+	}
+
+	// De-register active webhooks and schedulers to avoid run attempts on deleted resources
+	utils.UnregisterWebhooksForWorkflow(workflowId)
+	utils.StopWorkflowSchedulers(workflowId)
+
+	err = db.Queries.DeleteWorkflowById(r.Context(), database.DeleteWorkflowByIdParams{
+		ID:     workflowId,
+		UserID: userId,
+	})
+	if err != nil {
+		utils.RespondWithError(w, 400, fmt.Sprintf("Error deleting workflow: %v", err))
+		return
+	}
+
+	utils.RespondWithJson(w, 200, map[string]string{"message": "Workflow deleted successfully"})
+}
+

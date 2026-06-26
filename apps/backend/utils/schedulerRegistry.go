@@ -87,6 +87,46 @@ func StopWorkflowSchedulers(workflowID uuid.UUID) {
 	})
 }
 
+func RegisterSchedulersForWorkflow(ctx context.Context, q *database.Queries, workflowID uuid.UUID, nodesJSON any, status database.WorkflowStatus) error {
+	if status != database.WorkflowStatusActive {
+		return nil
+	}
+
+	var nodes []Node
+	if err := unmarshalAny(nodesJSON, &nodes); err != nil {
+		return fmt.Errorf("failed to parse nodes: %w", err)
+	}
+
+	for _, node := range nodes {
+		if node.Type != "schedulerNode" {
+			continue
+		}
+
+		interval, err := parseInterval(node.Data)
+		if err != nil {
+			fmt.Printf("schedulerNode %s in workflow %s: %v\n", node.ID, workflowID, err)
+			continue
+		}
+
+		event := TriggerEvent{
+			WorkflowID:    workflowID.String(),
+			TriggerNodeID: node.ID,
+			Input:         map[string]any{"triggeredAt": time.Now().UTC()},
+		}
+
+		jobID := GlobalScheduler.StartSchedule(ctx, interval, event, buildTriggerFn(q, workflowID))
+
+		mapKey := fmt.Sprintf("%s/%s", workflowID, node.ID)
+		schedulerJobMap.Store(mapKey, jobID)
+
+		fmt.Printf("registered scheduler: workflow=%s node=%s interval=%s jobID=%s\n",
+			workflowID, node.ID, interval, jobID)
+	}
+
+	return nil
+}
+
+
 func buildTriggerFn(q *database.Queries, workflowID uuid.UUID) TriggerFn {
 	return func(ctx context.Context, event TriggerEvent) {
 		wf, err := q.GetWorkflowById(ctx, workflowID)

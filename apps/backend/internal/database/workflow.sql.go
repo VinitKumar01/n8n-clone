@@ -53,6 +53,20 @@ func (q *Queries) CreateWorkflow(ctx context.Context, arg CreateWorkflowParams) 
 	return i, err
 }
 
+const deleteWorkflowById = `-- name: DeleteWorkflowById :exec
+DELETE FROM workflow WHERE id = $1 AND user_id = $2
+`
+
+type DeleteWorkflowByIdParams struct {
+	ID     uuid.UUID
+	UserID string
+}
+
+func (q *Queries) DeleteWorkflowById(ctx context.Context, arg DeleteWorkflowByIdParams) error {
+	_, err := q.db.ExecContext(ctx, deleteWorkflowById, arg.ID, arg.UserID)
+	return err
+}
+
 const getActiveWorkflows = `-- name: GetActiveWorkflows :many
 SELECT id, workflow_name, user_id, nodes, edges, status, created_at, updated_at FROM workflow WHERE status = 'active'
 `

@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getWorkflows } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
-import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import type { Edge, Node } from "reactflow";
@@ -17,6 +17,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import axios from "axios";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -51,6 +61,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
+  const [deletingWorkflow, setDeletingWorkflow] = useState<Workflow | null>(
+    null,
+  );
   const newNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -143,6 +156,17 @@ export default function DashboardPage() {
                                 className="p-1 rounded-md text-white/35 hover:text-white/80 hover:bg-white/5 opacity-0 group-hover:opacity-100 transition duration-150 cursor-pointer shrink-0"
                               >
                                 <Pencil size={14} />
+                              </span>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingWorkflow(workflow);
+                                }}
+                                role="button"
+                                title="Delete workflow"
+                                className="p-1 rounded-md text-red-500/60 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition duration-150 cursor-pointer shrink-0"
+                              >
+                                <Trash size={14} />
                               </span>
                             </div>
                             <span
@@ -274,6 +298,48 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!deletingWorkflow}
+        onOpenChange={(open) => {
+          if (!open) setDeletingWorkflow(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the workflow &quot;
+              {deletingWorkflow?.workflow_name}&quot; and remove all its
+              configuration. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingWorkflow(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                if (!deletingWorkflow || !BACKEND_URL) return;
+                try {
+                  await axios.delete(
+                    `${BACKEND_URL}/workflow/${deletingWorkflow.id}?userId=${deletingWorkflow.user_id}`,
+                  );
+                  setWorkflows((prev) =>
+                    prev.filter((w) => w.id !== deletingWorkflow.id),
+                  );
+                  setDeletingWorkflow(null);
+                } catch (error) {
+                  console.error("Failed to delete workflow:", error);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
