@@ -4,10 +4,22 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getWorkflows } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
-import { Circle, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import type { Edge, Node } from "reactflow";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import axios from "axios";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 type Workflow = {
   id: string;
@@ -26,10 +38,6 @@ function WorkflowCardSkeleton() {
       <div className="space-y-3">
         <Skeleton className="h-6 w-3/5 rounded-md bg-white/10" />
         <Skeleton className="h-4 w-2/5 rounded-md bg-white/10" />
-        <div className="flex items-center gap-2 pt-1">
-          <Skeleton className="h-2.5 w-2.5 rounded-full bg-white/10" />
-          <Skeleton className="h-4 w-20 rounded-md bg-white/10" />
-        </div>
       </div>
     </div>
   );
@@ -42,6 +50,8 @@ export default function DashboardPage() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
+  const newNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchWorkflows = async () => {
@@ -114,14 +124,27 @@ export default function DashboardPage() {
                       onClick={() => {
                         router.push(`/workflow/${workflow.id}`);
                       }}
-                      className="group rounded-2xl border border-white/5 bg-[#1f1f1f] p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-white/10 hover:bg-[#222] hover:shadow-lg hover:shadow-black/20 focus:outline-none focus:ring-2 focus:ring-white/10"
+                      className="group rounded-2xl border border-white/5 bg-[#1f1f1f] p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-white/10 hover:bg-[#222] hover:shadow-lg hover:shadow-black/20 focus:outline-none focus:ring-2 focus:ring-white/10 cursor-pointer"
                     >
                       <div className="flex h-full flex-col justify-between gap-5">
-                        <div className="space-y-3">
+                        <div className="space-y-3 w-full">
                           <div className="flex items-start justify-between gap-3">
-                            <h3 className="line-clamp-1 text-xl font-semibold tracking-tight text-[#E5E5E5]">
-                              {workflow.workflow_name}
-                            </h3>
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <h3 className="line-clamp-1 text-xl font-semibold tracking-tight text-[#E5E5E5] break-all">
+                                {workflow.workflow_name}
+                              </h3>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingWorkflow(workflow);
+                                }}
+                                role="button"
+                                title="Rename workflow"
+                                className="p-1 rounded-md text-white/35 hover:text-white/80 hover:bg-white/5 opacity-0 group-hover:opacity-100 transition duration-150 cursor-pointer shrink-0"
+                              >
+                                <Pencil size={14} />
+                              </span>
+                            </div>
                             <span
                               className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
                                 isActive
@@ -135,20 +158,6 @@ export default function DashboardPage() {
 
                           <div className="text-sm text-white/45">
                             id: {workflow.id}
-                          </div>
-
-                          <div className="flex items-center gap-2 pt-1">
-                            <Circle
-                              className={
-                                isActive
-                                  ? "fill-green-500 stroke-green-500"
-                                  : "fill-orange-400 stroke-orange-400"
-                              }
-                              size={10}
-                            />
-                            <div className="text-sm capitalize text-white/70">
-                              {isActive ? "Active workflow" : "Not active"}
-                            </div>
                           </div>
                         </div>
 
@@ -207,6 +216,64 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      <Dialog
+        open={!!editingWorkflow}
+        onOpenChange={(open) => {
+          if (!open) setEditingWorkflow(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Workflow</DialogTitle>
+          </DialogHeader>
+          <div className="pt-2">
+            <Input
+              key={editingWorkflow?.id}
+              ref={newNameRef}
+              placeholder="New workflow name"
+              defaultValue={editingWorkflow?.workflow_name}
+            />
+          </div>
+          <DialogFooter className="pt-4">
+            <div className="flex gap-2 justify-end w-full">
+              <Button variant="ghost" onClick={() => setEditingWorkflow(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  const newName = newNameRef.current?.value || "";
+                  if (!editingWorkflow || !newName.trim() || !BACKEND_URL)
+                    return;
+                  try {
+                    await axios.put(`${BACKEND_URL}/workflow`, {
+                      workflow_name: newName.trim(),
+                      user_id: editingWorkflow.user_id,
+                      nodes: editingWorkflow.nodes,
+                      edges: editingWorkflow.edges,
+                      status: editingWorkflow.status,
+                      workflow_id: editingWorkflow.id,
+                    });
+
+                    setWorkflows((prev) =>
+                      prev.map((w) =>
+                        w.id === editingWorkflow.id
+                          ? { ...w, workflow_name: newName.trim() }
+                          : w,
+                      ),
+                    );
+                    setEditingWorkflow(null);
+                  } catch (error) {
+                    console.error("Failed to rename workflow:", error);
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
