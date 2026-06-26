@@ -1,6 +1,7 @@
 "use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Handle, Position, Node as RFNode } from "reactflow";
+import { Handle, Position } from "reactflow";
 import "reactflow/dist/style.css";
 import { IconPointer } from "@tabler/icons-react";
 import {
@@ -10,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "../ui/dialog";
 import Link from "next/link";
 import Image from "next/image";
@@ -23,6 +25,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import { MergeIcon, WebhookIcon, MailIcon } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import GeminiIcon from "@/icons/GeminiIcon";
@@ -36,60 +39,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
-import type { Dispatch, SetStateAction } from "react";
-import type { AppNodeData } from "../Flow";
+import { useWorkflowStore, AppNodeData } from "@/hooks/useWorkflowStore";
+
 export type NodePayload = unknown;
-export type OnSend = (nodeId: string, payload: NodePayload) => void;
-type MutableNodeData<T> = T & { [key: string]: unknown };
-export type TriggerData = MutableNodeData<{
-  onSend?: OnSend;
-  workflowId: string;
-  received?: NodePayload;
-  status: boolean;
-}>;
-export type WebhookData = MutableNodeData<{
-  workflowId?: string;
-  status?: boolean;
-}>;
-export type GeminiInputs = {
-  apiKey?: string;
-  model?: string;
-  prompt?: string;
-};
-export type GeminiData = MutableNodeData<{
-  inputs?: GeminiInputs;
-  onSend?: OnSend;
-  received?: NodePayload;
-  setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
-}>;
-export type ShowOutputData = MutableNodeData<{
-  received?: NodePayload;
-}>;
-export type MergeData = MutableNodeData<{
-  received?: NodePayload;
-}>;
-export type SchedulerData = MutableNodeData<{
-  inputs?: {
-    interval?: string;
-  };
-  workflowId?: string;
-  status?: boolean;
-  setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
-}>;
-export type ResendInputs = {
-  apiKey?: string;
-  from?: string;
-  to?: string;
-  subject?: string;
-};
-export type ResendData = MutableNodeData<{
-  inputs?: ResendInputs;
-  received?: NodePayload;
-  setNodes?: Dispatch<SetStateAction<RFNode<AppNodeData>[]>>;
-}>;
+
 function isString(v: unknown): v is string {
   return typeof v === "string";
 }
+
 function prettyPrintPayload(p: NodePayload): string {
   if (p === null || p === undefined) return "<no output yet>";
   if (isString(p)) return p;
@@ -99,67 +56,35 @@ function prettyPrintPayload(p: NodePayload): string {
     return String(p);
   }
 }
-export function TriggerManually({
-  id,
-  data,
-}: {
-  id: string;
-  data: TriggerData;
-}) {
-  const status = data.status;
+
+// ----------------- TriggerManually -----------------
+export function TriggerManually({ id }: { id: string }) {
   const { user } = useUser();
+  const workflowId = useWorkflowStore((state) => state.workflowId);
+  const status = useWorkflowStore((state) => state.status);
+  const executeWorkflow = useWorkflowStore((state) => state.executeWorkflow);
+
   const executeNode = useCallback(async () => {
-    if (!data.workflowId || !status) {
+    if (!workflowId || !status || !user?.id) {
       return;
     }
-    try {
-      const myHeaders = new Headers();
-      myHeaders.append("Content-Type", "application/json");
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/workflow/${data.workflowId}/execute`,
-        {
-          method: "POST",
-          headers: myHeaders,
-          body: JSON.stringify({
-            startNode: id,
-            userId: user?.id,
-          }),
-          redirect: "follow",
-        },
-      );
-      if (!response.ok) {
-        const text = await response.text();
-        console.error("Failed to execute workflow:", response.status, text);
-        return;
-      }
-      const body = (await response.json()) as {
-        results?: Record<string, NodePayload>;
-      };
-      const results = body.results ?? {};
-      Object.entries(results).forEach(([nodeId, payload]) => {
-        try {
-          data.onSend?.(nodeId, payload);
-        } catch (e) {
-          console.error("onSend error for node", nodeId, e);
-        }
-      });
-    } catch (err) {
-      console.error("Error executing workflow:", err);
-    }
-  }, [id, data, user?.id, status]);
+    await executeWorkflow(user.id, id);
+  }, [id, workflowId, status, user?.id, executeWorkflow]);
+
   const TriggerContent = (
     <div
       className="border p-4 bg-[#262626] rounded-2xl cursor-pointer"
       role="button"
       title="Run workflow from this node"
-      onClick={data.workflowId ? executeNode : undefined}
+      onClick={workflowId && status ? executeNode : undefined}
     >
       <IconPointer size={35} />
-      <pre className="font-semibold">Click</pre>
+      <pre className="font-semibold text-[#E5E5E5] mt-1 text-center">Click</pre>
       <Handle type="source" position={Position.Right} />
     </div>
   );
-  if (!data.workflowId || !status) {
+
+  if (!workflowId || !status) {
     return (
       <AlertDialog>
         <AlertDialogTrigger asChild>{TriggerContent}</AlertDialogTrigger>
@@ -178,122 +103,128 @@ export function TriggerManually({
       </AlertDialog>
     );
   }
+
   return TriggerContent;
 }
-export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
+
+// ----------------- GeminiNode -----------------
+export function GeminiNode({ id, data }: { id: string; data: AppNodeData }) {
+  const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
+
   const promptRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
-  const [prompt, setPrompt] = useState<string | undefined>(
-    (data.inputs as GeminiInputs | undefined)?.prompt,
-  );
-  const [apiKey, setApiKey] = useState<string | undefined>(
-    (data.inputs as GeminiInputs | undefined)?.apiKey,
-  );
-  const [model, setModel] = useState<string>(
-    (data.inputs as GeminiInputs | undefined)?.model ?? "gemini-2.5-flash",
-  );
-  const [output, setOutput] = useState<NodePayload | null>(
-    (data.received as NodePayload) ?? null,
-  );
+
+  const inputs = data.inputs ?? {};
+  const prompt = inputs.prompt;
+  const apiKey = inputs.apiKey;
+  const model = inputs.model ?? "gemini-2.5-flash";
+  const output = data.received ?? null;
+
+  const [localModel, setLocalModel] = useState<string>(model);
+
+  // Sync state if model changes externally
   useEffect(() => {
-    if (data.received !== undefined) {
-      setOutput(data.received as NodePayload);
-    }
-  }, [data.received]);
+    setLocalModel(model);
+  }, [model]);
+
   return (
-    <div className="bg-[#262626] p-4 rounded-2xl">
+    <div className="bg-[#262626] p-4 rounded-2xl border border-neutral-800 text-[#E5E5E5]">
       <Dialog>
-        <DialogTrigger className="flex justify-center items-center w-full">
+        <DialogTrigger className="flex justify-center items-center w-full focus:outline-none">
           <GeminiIcon />
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Gemini Node options</DialogTitle>
-            <DialogTrigger className="flex justify-start">
-              <pre>To get Gemini api-key visit: </pre>
+            <div className="flex justify-start text-xs pt-1">
+              <span>To get Gemini api-key visit: </span>
               <Link
-                href={"https://aistudio.google.com/app/apikey"}
-                className="text-blue-500"
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                className="text-blue-500 hover:underline ml-1"
               >
                 Google AI Studio
               </Link>
-            </DialogTrigger>
-            <DialogDescription>
+            </div>
+            <DialogDescription className="pt-2 text-xs">
               These options will be used when this node is triggered by the
               workflow.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col justify-center items-center gap-4 p-4 rounded-2xl">
-            <input
-              ref={promptRef}
-              placeholder="Prompt"
-              className="border border-dashed border-white rounded-md p-2"
-              defaultValue={prompt}
-            />
-            <input
-              ref={apiKeyRef}
-              placeholder="ApiKey"
-              className="border border-dashed border-white rounded-md p-2"
-              defaultValue={apiKey}
-            />
-            <Select
-              onValueChange={(value: string) => setModel(value)}
-              defaultValue={model}
-            >
-              <SelectTrigger className="w-[270px]">
-                <SelectValue placeholder="Models" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Models</SelectLabel>
-                  <SelectItem value="gemini-2.5-flash">
-                    gemini-2.5-flash
-                  </SelectItem>
-                  <SelectItem value="gemini-2.5-pro">gemini-2.5-pro</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-4 py-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold">Prompt</label>
+              <Input
+                ref={promptRef}
+                placeholder="Enter AI prompt..."
+                defaultValue={prompt}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold">API Key</label>
+              <Input
+                ref={apiKeyRef}
+                type="password"
+                placeholder="Enter Gemini API Key..."
+                defaultValue={apiKey}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold">Model</label>
+              <Select
+                onValueChange={(value: string) => setLocalModel(value)}
+                defaultValue={localModel}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select model..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Models</SelectLabel>
+                    <SelectItem value="gemini-2.5-flash">
+                      gemini-2.5-flash
+                    </SelectItem>
+                    <SelectItem value="gemini-2.5-pro">
+                      gemini-2.5-pro
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
             <Button
+              className="w-full"
               onClick={() => {
                 const newApiKey = apiKeyRef.current?.value ?? "";
                 const newPrompt = promptRef.current?.value ?? "";
-                setApiKey(newApiKey);
-                setPrompt(newPrompt);
-                data.setNodes?.((nds) =>
-                  nds.map((node) =>
-                    node.id === id
-                      ? {
-                          ...node,
-                          data: {
-                            ...node.data,
-                            inputs: {
-                              apiKey: newApiKey,
-                              model,
-                              prompt: newPrompt,
-                            },
-                          },
-                        }
-                      : node,
-                  ),
-                );
+                updateNodeData(id, {
+                  inputs: {
+                    apiKey: newApiKey,
+                    model: localModel,
+                    prompt: newPrompt,
+                  },
+                });
               }}
             >
               Save values
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-      <div className="mt-2">
-        <div className="text-xs text-muted-foreground mb-2">
+      <div className="mt-3">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
           Configured prompt
         </div>
-        <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
+        <pre className="text-xs p-2 rounded bg-[#111111] text-wrap break-words max-h-24 overflow-y-auto">
           {prompt ?? "<not configured>"}
         </pre>
       </div>
       <div className="mt-3">
-        <div className="text-xs text-muted-foreground mb-1">Output</div>
-        <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
+          Output
+        </div>
+        <pre className="text-xs p-2 rounded bg-[#111111] max-w-48 text-wrap break-words max-h-32 overflow-y-auto">
           {output ? prettyPrintPayload(output) : "<no output yet>"}
         </pre>
       </div>
@@ -302,22 +233,27 @@ export function GeminiNode({ id, data }: { id: string; data: GeminiData }) {
     </div>
   );
 }
-export function ShowOutput({ data }: { data: ShowOutputData }) {
+
+// ----------------- ShowOutput -----------------
+export function ShowOutput({ data }: { data: AppNodeData }) {
   const payload = data.received;
   return (
-    <div className="p-2 border rounded-2xl bg-[#262626]">
-      <div>Show Output</div>
-      <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
-        {payload ? prettyPrintPayload(payload) : ""}
+    <div className="p-4 border border-neutral-800 rounded-2xl bg-[#262626] text-[#E5E5E5]">
+      <div className="text-sm font-semibold mb-2 text-center">Show Output</div>
+      <pre className="text-xs p-2 rounded bg-[#111111] max-w-48 text-wrap break-words max-h-40 overflow-y-auto">
+        {payload ? prettyPrintPayload(payload) : "<waiting for data>"}
       </pre>
       <Handle type="target" position={Position.Left} />
     </div>
   );
 }
-export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
-  const status = data.status;
-  const workflowId = data.workflowId;
+
+// ----------------- WebhookNode -----------------
+export function WebhookNode({ id }: { id: string }) {
+  const workflowId = useWorkflowStore((state) => state.workflowId);
+  const status = useWorkflowStore((state) => state.status);
   const [url, setUrl] = useState<string>("");
+
   useEffect(() => {
     const base = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (workflowId) {
@@ -326,22 +262,24 @@ export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
       setUrl(`${base}/webhook/<workflowId>/${id}`);
     }
   }, [workflowId, id]);
+
   const NodeBody = (
-    <div className="bg-[#262626] p-4 rounded-2xl cursor-pointer">
-      <div className="flex justify-center w-full">
-        <WebhookIcon />
+    <div className="bg-[#262626] p-4 border border-neutral-800 rounded-2xl cursor-pointer text-[#E5E5E5]">
+      <div className="flex justify-center w-full mb-2">
+        <WebhookIcon size={28} />
       </div>
-      <div className="mt-2">
+      <div className="text-center">
         <div className="text-xs text-muted-foreground mb-1">
           Webhook trigger
         </div>
-        <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
+        <pre className="text-xs p-1 rounded bg-[#111111] inline-block px-2">
           POST
         </pre>
       </div>
       <Handle type="source" position={Position.Right} />
     </div>
   );
+
   if (!workflowId || !status) {
     return (
       <AlertDialog>
@@ -361,6 +299,7 @@ export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
       </AlertDialog>
     );
   }
+
   return (
     <Dialog>
       <DialogTrigger asChild>{NodeBody}</DialogTrigger>
@@ -372,8 +311,10 @@ export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4 p-4">
-          <div className="text-xs text-muted-foreground">Webhook URL</div>
-          <pre className="text-xs bg-[#111] p-2 rounded text-wrap break-all">
+          <div className="text-xs text-muted-foreground font-semibold">
+            Webhook URL
+          </div>
+          <pre className="text-xs bg-[#111] p-3 rounded text-wrap break-all select-all border border-neutral-800">
             {url}
           </pre>
           <Button onClick={() => navigator.clipboard.writeText(url)}>
@@ -384,39 +325,40 @@ export function WebhookNode({ id, data }: { id: string; data: WebhookData }) {
     </Dialog>
   );
 }
-export function MergeNode({ data }: { data: MergeData }) {
+
+// ----------------- MergeNode -----------------
+export function MergeNode({ data }: { data: AppNodeData }) {
   const payload = data.received;
   return (
-    <div className="p-2 border rounded-2xl bg-[#262626]">
-      <div className="flex justify-center items-center p-4 gap-2">
-        <MergeIcon />
-        <div>Merge</div>
+    <div className="p-4 border border-neutral-800 rounded-2xl bg-[#262626] text-[#E5E5E5]">
+      <div className="flex justify-center items-center gap-2 mb-2">
+        <MergeIcon size={20} />
+        <span className="text-sm font-semibold">Merge</span>
       </div>
-      <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
-        {payload ? prettyPrintPayload(payload) : ""}
+      <pre className="text-xs p-2 rounded bg-[#111111] max-w-48 text-wrap break-words max-h-40 overflow-y-auto">
+        {payload ? prettyPrintPayload(payload) : "<waiting for merge data>"}
       </pre>
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
     </div>
   );
 }
-export function SchedulerNode({
-  id,
-  data,
-}: {
-  id: string;
-  data: SchedulerData;
-}) {
-  const [interval, setInterval] = useState<string>(
-    data.inputs?.interval ?? "5m",
-  );
-  const [inputValue, setInputValue] = useState<string>(
-    data.inputs?.interval ?? "5m",
-  );
-  const status = data.status;
-  const workflowId = data.workflowId;
+
+// ----------------- SchedulerNode -----------------
+export function SchedulerNode({ id, data }: { id: string; data: AppNodeData }) {
+  const workflowId = useWorkflowStore((state) => state.workflowId);
+  const status = useWorkflowStore((state) => state.status);
+  const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
+
+  const interval = data.inputs?.interval ?? "5m";
+  const [inputValue, setInputValue] = useState<string>(interval);
+
+  useEffect(() => {
+    setInputValue(interval);
+  }, [interval]);
+
   const NodeBody = (
-    <div className="bg-[#262626] p-4 rounded-2xl cursor-pointer min-w-[160px]">
+    <div className="bg-[#262626] p-4 border border-neutral-800 rounded-2xl cursor-pointer min-w-[160px] text-[#E5E5E5]">
       <div className="flex justify-center w-full mb-2">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -433,13 +375,16 @@ export function SchedulerNode({
           <polyline points="12 6 12 12 16 14" />
         </svg>
       </div>
-      <div className="text-xs text-muted-foreground mb-1">Scheduler</div>
-      <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
-        every {interval}
-      </pre>
+      <div className="text-center">
+        <div className="text-xs text-muted-foreground mb-1">Scheduler</div>
+        <pre className="text-sm p-1 rounded bg-[#111111] inline-block px-2">
+          every {interval}
+        </pre>
+      </div>
       <Handle type="source" position={Position.Right} />
     </div>
   );
+
   if (!workflowId || !status) {
     return (
       <AlertDialog>
@@ -458,6 +403,7 @@ export function SchedulerNode({
       </AlertDialog>
     );
   }
+
   return (
     <Dialog>
       <DialogTrigger asChild>{NodeBody}</DialogTrigger>
@@ -469,31 +415,21 @@ export function SchedulerNode({
             30s, 5m, 1h).
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4 p-4">
-          <div className="text-xs text-muted-foreground">Interval</div>
-          <input
-            className="border border-dashed border-white rounded-md p-2 bg-transparent"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="e.g. 30s, 5m, 1h"
-          />
+        <div className="flex flex-col gap-4 py-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold">Interval</label>
+            <Input
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="e.g. 30s, 5m, 1h"
+            />
+          </div>
           <Button
             onClick={() => {
               const val = inputValue.trim() || "5m";
-              setInterval(val);
-              data.setNodes?.((nds: RFNode<AppNodeData>[]) =>
-                nds.map((node) =>
-                  node.id === id
-                    ? {
-                        ...node,
-                        data: {
-                          ...node.data,
-                          inputs: { interval: val },
-                        },
-                      }
-                    : node,
-                ),
-              );
+              updateNodeData(id, {
+                inputs: { interval: val },
+              });
             }}
           >
             Save
@@ -503,121 +439,124 @@ export function SchedulerNode({
     </Dialog>
   );
 }
-export function ResendNode({ id, data }: { id: string; data: ResendData }) {
+
+// ----------------- ResendNode -----------------
+export function ResendNode({ id, data }: { id: string; data: AppNodeData }) {
+  const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
+
   const apiKeyRef = useRef<HTMLInputElement>(null);
   const fromRef = useRef<HTMLInputElement>(null);
   const toRef = useRef<HTMLInputElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
-  const [to, setTo] = useState<string | undefined>(
-    (data.inputs as ResendInputs | undefined)?.to,
-  );
-  const [subject, setSubject] = useState<string | undefined>(
-    (data.inputs as ResendInputs | undefined)?.subject,
-  );
-  const [output, setOutput] = useState<NodePayload | null>(
-    (data.received as NodePayload) ?? null,
-  );
-  useEffect(() => {
-    if (data.received !== undefined) {
-      setOutput(data.received as NodePayload);
-    }
-  }, [data.received]);
+
+  const inputs = data.inputs ?? {};
+  const to = inputs.to;
+  const subject = inputs.subject;
+  const output = data.received ?? null;
+
   return (
-    <div className="bg-[#262626] p-4 rounded-2xl">
+    <div className="bg-[#262626] p-4 border border-neutral-800 rounded-2xl text-[#E5E5E5] min-w-[160px]">
       <Dialog>
-        <DialogTrigger className="flex justify-center items-center w-full">
+        <DialogTrigger className="flex justify-center items-center w-full focus:outline-none">
           <MailIcon size={28} />
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Resend Email Node</DialogTitle>
-            <DialogTrigger className="flex justify-start">
-              <pre>To get Resend api-key visit: </pre>
+            <div className="flex justify-start text-xs pt-1">
+              <span>To get Resend api-key visit: </span>
               <Link
-                href={"https://resend.com/api-keys"}
-                className="text-blue-500"
+                href="https://resend.com/api-keys"
+                target="_blank"
+                className="text-blue-500 hover:underline ml-1"
               >
                 Resend Dashboard
               </Link>
-            </DialogTrigger>
-            <DialogDescription>
+            </div>
+            <DialogDescription className="pt-2 text-xs">
               These options will be used when this node is triggered by the
               workflow.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col justify-center items-center gap-4 p-4 rounded-2xl">
-            <input
-              ref={apiKeyRef}
-              placeholder="Resend API Key"
-              className="border border-dashed border-white rounded-md p-2 w-full"
-              defaultValue={(data.inputs as ResendInputs | undefined)?.apiKey}
-            />
-            <input
-              ref={fromRef}
-              placeholder="From (e.g. you@yourdomain.com)"
-              className="border border-dashed border-white rounded-md p-2 w-full"
-              defaultValue={(data.inputs as ResendInputs | undefined)?.from}
-            />
-            <input
-              ref={toRef}
-              placeholder="To (recipient email)"
-              className="border border-dashed border-white rounded-md p-2 w-full"
-              defaultValue={to}
-            />
-            <input
-              ref={subjectRef}
-              placeholder="Subject"
-              className="border border-dashed border-white rounded-md p-2 w-full"
-              defaultValue={subject}
-            />
+          <div className="flex flex-col gap-4 py-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold">Resend API Key</label>
+              <Input
+                ref={apiKeyRef}
+                type="password"
+                placeholder="Enter Resend API Key..."
+                defaultValue={inputs.apiKey}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold">From Address</label>
+              <Input
+                ref={fromRef}
+                placeholder="From (e.g. you@yourdomain.com)"
+                defaultValue={inputs.from}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold">To Address</label>
+              <Input
+                ref={toRef}
+                placeholder="Recipient email address"
+                defaultValue={to}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold">Subject</label>
+              <Input
+                ref={subjectRef}
+                placeholder="Email Subject"
+                defaultValue={subject}
+              />
+            </div>
+          </div>
+          <DialogFooter>
             <Button
+              className="w-full"
               onClick={() => {
                 const newApiKey = apiKeyRef.current?.value ?? "";
                 const newFrom = fromRef.current?.value ?? "";
                 const newTo = toRef.current?.value ?? "";
                 const newSubject = subjectRef.current?.value ?? "";
-                setTo(newTo);
-                setSubject(newSubject);
-                data.setNodes?.((nds: RFNode<AppNodeData>[]) =>
-                  nds.map((node) =>
-                    node.id === id
-                      ? {
-                          ...node,
-                          data: {
-                            ...node.data,
-                            inputs: {
-                              apiKey: newApiKey,
-                              from: newFrom,
-                              to: newTo,
-                              subject: newSubject,
-                            },
-                          },
-                        }
-                      : node,
-                  ),
-                );
+                updateNodeData(id, {
+                  inputs: {
+                    apiKey: newApiKey,
+                    from: newFrom,
+                    to: newTo,
+                    subject: newSubject,
+                  },
+                });
               }}
             >
               Save values
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-      <div className="mt-2">
-        <div className="text-xs text-muted-foreground mb-2">Sending to</div>
-        <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
+      <div className="mt-3">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
+          Sending to
+        </div>
+        <pre className="text-xs p-2 rounded bg-[#111111] text-wrap break-words">
           {to ?? "<not configured>"}
         </pre>
       </div>
-      <div className="mt-2">
-        <div className="text-xs text-muted-foreground mb-2">Subject</div>
-        <pre className="text-sm p-2 rounded bg-[#111111] text-wrap break-words">
+      <div className="mt-3">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
+          Subject
+        </div>
+        <pre className="text-xs p-2 rounded bg-[#111111] text-wrap break-words">
           {subject ?? "<not configured>"}
         </pre>
       </div>
       <div className="mt-3">
-        <div className="text-xs text-muted-foreground mb-1">Last send</div>
-        <pre className="text-xs p-1 rounded max-w-48 text-wrap break-words">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
+          Last send status
+        </div>
+        <pre className="text-xs p-2 rounded bg-[#111111] max-w-48 text-wrap break-words max-h-24 overflow-y-auto">
           {output ? prettyPrintPayload(output) : "<not sent yet>"}
         </pre>
       </div>
@@ -625,6 +564,7 @@ export function ResendNode({ id, data }: { id: string; data: ResendData }) {
     </div>
   );
 }
+
 export const nodeTypes = {
   triggerManually: TriggerManually,
   geminiNode: GeminiNode,
@@ -634,6 +574,7 @@ export const nodeTypes = {
   schedulerNode: SchedulerNode,
   resendNode: ResendNode,
 };
+
 export const nodes = [
   {
     name: "Gemini",
@@ -642,7 +583,7 @@ export const nodes = [
       return (
         <div className="h-full bg-[#262626] p-4 rounded-2xl flex justify-center items-center">
           <Image
-            src={"/gemini-color.svg"}
+            src="/gemini-color.svg"
             alt="Gemini"
             width={50}
             height={50}
@@ -657,8 +598,8 @@ export const nodes = [
     type: "showOutput",
     component: () => {
       return (
-        <div className="p-4 h-full flex justify-center items-center border rounded-2xl bg-[#262626]">
-          <div className="font-semibold">Output</div>
+        <div className="p-4 h-full flex justify-center items-center border border-neutral-800 rounded-2xl bg-[#262626]">
+          <div className="font-semibold text-[#E5E5E5]">Output</div>
         </div>
       );
     },
@@ -668,7 +609,7 @@ export const nodes = [
     type: "mergeNode",
     component: () => {
       return (
-        <div className="p-4 h-full flex justify-center items-center border rounded-2xl bg-[#262626]">
+        <div className="p-4 h-full flex justify-center items-center border border-neutral-800 rounded-2xl bg-[#262626] text-[#E5E5E5]">
           <div className="flex flex-col justify-center items-center gap-2">
             <MergeIcon />
             <div>Merge</div>
@@ -682,7 +623,7 @@ export const nodes = [
     type: "webhookNode",
     component: () => {
       return (
-        <div className="h-full w-full bg-[#262626] p-4 rounded-2xl flex justify-center items-center">
+        <div className="h-full w-full bg-[#262626] p-4 rounded-2xl flex justify-center items-center text-[#E5E5E5]">
           <WebhookIcon />
         </div>
       );
@@ -693,9 +634,9 @@ export const nodes = [
     type: "triggerManually",
     component: () => {
       return (
-        <div className="h-full border p-4 bg-[#262626] rounded-2xl cursor-pointer">
+        <div className="h-full border border-neutral-800 p-4 bg-[#262626] rounded-2xl cursor-pointer text-[#E5E5E5]">
           <IconPointer size={35} />
-          <pre className="font-semibold">Click</pre>
+          <pre className="font-semibold mt-1">Click</pre>
         </div>
       );
     },
@@ -705,7 +646,7 @@ export const nodes = [
     type: "schedulerNode",
     component: () => {
       return (
-        <div className="h-full bg-[#262626] p-4 rounded-2xl flex flex-col justify-center items-center gap-1">
+        <div className="h-full bg-[#262626] p-4 rounded-2xl flex flex-col justify-center items-center gap-1 text-[#E5E5E5]">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="28"
@@ -730,7 +671,7 @@ export const nodes = [
     type: "resendNode",
     component: () => {
       return (
-        <div className="h-full bg-[#262626] p-4 rounded-2xl flex flex-col justify-center items-center gap-1">
+        <div className="h-full bg-[#262626] p-4 rounded-2xl flex flex-col justify-center items-center gap-1 text-[#E5E5E5]">
           <MailIcon size={28} />
           <div className="text-xs font-semibold">Email</div>
         </div>
