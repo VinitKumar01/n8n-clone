@@ -16,10 +16,9 @@ type WebhookRoute struct {
 
 var WebhookRegistry = map[string]WebhookRoute{}
 
-func RegisterWebhooks(ctx context.Context, q *database.Queries) error {
+func RegisterWebhooks(ctx context.Context, q database.Querier) error {
 	// Clear registry first to ensure clean initialization
 	WebhookRegistry = map[string]WebhookRoute{}
-
 	type rawNode struct {
 		ID   string         `json:"id"`
 		Type string         `json:"type"`
