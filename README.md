@@ -2,6 +2,9 @@
 
 An open-source workflow automation tool built with Turborepo, Next.js, and Go, heavily inspired by n8n.
 
+For a detailed breakdown of the system design, components, and step-by-step execution workflows, see the **[ARCHITECTURE.md](ARCHITECTURE.md)** guide.
+
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
