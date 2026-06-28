@@ -128,7 +128,7 @@ func (db Db) dbUpdateWorkflowTx(ctx context.Context, params *workflowUpdateParam
 		return database.Workflow{}, fmt.Errorf("failed to start transaction: %w", err)
 	}
 
-	var qtx database.Querier = db.Queries
+	qtx := db.Queries
 	if concreteQueries, ok := db.Queries.(*database.Queries); ok {
 		qtx = concreteQueries.WithTx(tx)
 	}
@@ -141,7 +141,7 @@ func (db Db) dbUpdateWorkflowTx(ctx context.Context, params *workflowUpdateParam
 	})
 	if err != nil {
 		rollbackErr := tx.Rollback()
-		return database.Workflow{}, fmt.Errorf("Metadata save failed: %v %v", err, rollbackErr)
+		return database.Workflow{}, fmt.Errorf("metadata save failed: %v %v", err, rollbackErr)
 	}
 
 	workflow, err := qtx.UpdateWorkflowById(ctx, database.UpdateWorkflowByIdParams{
@@ -155,11 +155,11 @@ func (db Db) dbUpdateWorkflowTx(ctx context.Context, params *workflowUpdateParam
 	})
 	if err != nil {
 		rollbackErr := tx.Rollback()
-		return database.Workflow{}, fmt.Errorf("Error updating the workflow: %v %v", err, rollbackErr)
+		return database.Workflow{}, fmt.Errorf("error updating the workflow: %v %v", err, rollbackErr)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return database.Workflow{}, fmt.Errorf("Commit failed")
+		return database.Workflow{}, fmt.Errorf("commit failed")
 	}
 
 	return workflow, nil
@@ -198,7 +198,7 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refreshWorkflowTriggers(r.Context(), db.Queries, workflow)
+	refreshWorkflowTriggers(context.Background(), db.Queries, workflow)
 
 	utils.RespondWithJson(w, 201, utils.DatabaseWorkflowToWorkflow(workflow))
 }
@@ -244,4 +244,3 @@ func (db Db) HandlerDeleteWorkflow(w http.ResponseWriter, r *http.Request) {
 
 	utils.RespondWithJson(w, 200, map[string]string{"message": "Workflow deleted successfully"})
 }
-
