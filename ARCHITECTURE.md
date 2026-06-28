@@ -181,6 +181,9 @@ sequenceDiagram
     }
     ```
 
+    > [!NOTE]
+    > **Reachable Subgraph Execution**: During execution context initialization, the engine traverses the DAG using Depth-First Search (DFS) starting from the `startNode` to identify all reachable nodes. The context-level in-degree map (`execCtx.InDegree`) is built only for these reachable nodes, ignoring incoming edges from unreachable nodes. This prevents execution from getting stuck on downstream nodes that have dependencies on parts of the workflow that are not being run.
+
 4. **Running Node Queue**: The start node runs first. Then, children are processed using the thread pool worker queue:
 
     ```go

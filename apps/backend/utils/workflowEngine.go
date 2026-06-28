@@ -121,7 +121,32 @@ func ExecuteWorkflow(
 		InDegree:   make(map[string]int),
 	}
 
-	maps.Copy(execCtx.InDegree, dag.InDegree)
+	// Find all nodes reachable from the startNode.
+	reachable := make(map[string]bool)
+	var dfs func(string)
+	dfs = func(nodeID string) {
+		if reachable[nodeID] {
+			return
+		}
+		reachable[nodeID] = true
+		for _, child := range dag.Edges[nodeID] {
+			dfs(child)
+		}
+	}
+	dfs(startNode)
+
+	// Build the in-degree map for reachable nodes only.
+	// Incoming edges from unreachable nodes are ignored since they will never run.
+	for nodeID := range reachable {
+		execCtx.InDegree[nodeID] = 0
+	}
+	for parentID := range reachable {
+		for _, childID := range dag.Edges[parentID] {
+			if reachable[childID] {
+				execCtx.InDegree[childID]++
+			}
+		}
+	}
 
 	maps.Copy(execCtx.Results, initialResults)
 
