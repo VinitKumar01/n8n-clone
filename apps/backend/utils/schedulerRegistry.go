@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"maps"
 	"sync"
@@ -16,21 +15,6 @@ var GlobalScheduler = NewScheduler()
 
 var schedulerJobMap sync.Map
 
-func unmarshalAny(raw any, dest any) error {
-	switch v := raw.(type) {
-	case string:
-		return json.Unmarshal([]byte(v), dest)
-	case []byte:
-		return json.Unmarshal(v, dest)
-	default:
-		b, err := json.Marshal(v)
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal(b, dest)
-	}
-}
-
 func RegisterSchedulers(ctx context.Context, q database.Querier) error {
 	workflows, err := q.GetActiveWorkflows(ctx)
 	if err != nil {
@@ -39,7 +23,7 @@ func RegisterSchedulers(ctx context.Context, q database.Querier) error {
 
 	for _, wf := range workflows {
 		var nodes []Node
-		if err := unmarshalAny(wf.Nodes, &nodes); err != nil {
+		if err := UnmarshalAny(wf.Nodes, &nodes); err != nil {
 			fmt.Printf("scheduler: failed to parse nodes for workflow %s: %v\n", wf.ID, err)
 			continue
 		}
@@ -93,7 +77,7 @@ func RegisterSchedulersForWorkflow(ctx context.Context, q database.Querier, work
 	}
 
 	var nodes []Node
-	if err := unmarshalAny(nodesJSON, &nodes); err != nil {
+	if err := UnmarshalAny(nodesJSON, &nodes); err != nil {
 		return fmt.Errorf("failed to parse nodes: %w", err)
 	}
 
@@ -140,99 +124,29 @@ func buildTriggerFn(q database.Querier, workflowID uuid.UUID) TriggerFn {
 			return
 		}
 
-		var edges map[string][]string
-		var inDegree map[string]int
-
-		if err := unmarshalAny(meta.Edges, &edges); err != nil {
-			fmt.Printf("scheduler: failed to parse edges: %v\n", err)
+		dag, err := LoadDAG(wf.Nodes, meta.Edges, meta.InDegree)
+		if err != nil {
+			fmt.Printf("scheduler: failed to load DAG for workflow %s: %v\n", workflowID, err)
 			return
 		}
-
-		if err := unmarshalAny(meta.InDegree, &inDegree); err != nil {
-			fmt.Printf("scheduler: failed to parse in_degree: %v\n", err)
-			return
-		}
-
-		var rawNodes []Node
-		if err := unmarshalAny(wf.Nodes, &rawNodes); err != nil {
-			fmt.Printf("scheduler: failed to parse nodes: %v\n", err)
-			return
-		}
-
-		dag := &DAG{
-			Nodes:    make(map[string]Node),
-			Edges:    edges,
-			InDegree: make(map[string]int),
-		}
-		maps.Copy(dag.InDegree, inDegree)
-		for _, n := range rawNodes {
-			dag.Nodes[n.ID] = n
-		}
-
-		execCtx := &ExecutionContext{
-			WorkflowID: workflowID.String(),
-			Results:    make(map[string]any),
-			InDegree:   make(map[string]int),
-		}
-		maps.Copy(execCtx.InDegree, inDegree)
 
 		inputCopy := make(map[string]any)
 		if event.Input != nil {
 			maps.Copy(inputCopy, event.Input)
 		}
 		inputCopy["triggeredAt"] = time.Now().UTC()
-		execCtx.Results[event.TriggerNodeID] = inputCopy
 
-		if err := ExecuteNode(ctx, event.TriggerNodeID, dag, execCtx); err != nil {
-			fmt.Printf("scheduler: failed to execute start node %s: %v\n", event.TriggerNodeID, err)
+		initialResults := map[string]any{
+			event.TriggerNodeID: inputCopy,
+		}
+
+		_, err = ExecuteWorkflow(ctx, workflowID.String(), dag, event.TriggerNodeID, initialResults)
+		if err != nil {
+			fmt.Printf("scheduler: workflow %s execution failed: %v\n", workflowID, err)
 			return
 		}
 
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
-		var mu sync.Mutex
-		errCh := make(chan error, 1)
-		tq := NewTaskQueue(100)
-
-		tq.StartWorkers(ctx, 4, func(ctx context.Context, nodeID string) error {
-			if err := ExecuteNode(ctx, nodeID, dag, execCtx); err != nil {
-				errCh <- err
-				cancel()
-				return err
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-
-			for _, child := range dag.Edges[nodeID] {
-				execCtx.InDegree[child]--
-				if execCtx.InDegree[child] == 0 {
-					tq.Enqueue(child)
-				}
-			}
-			return nil
-		})
-
-		for _, child := range dag.Edges[event.TriggerNodeID] {
-			execCtx.InDegree[child]--
-			if execCtx.InDegree[child] == 0 {
-				tq.Enqueue(child)
-			}
-		}
-
-		done := make(chan struct{})
-		go func() {
-			tq.Wait()
-			close(done)
-		}()
-
-		select {
-		case <-done:
-			fmt.Printf("scheduler: workflow %s execution complete\n", workflowID)
-		case err := <-errCh:
-			fmt.Printf("scheduler: workflow %s execution failed: %v\n", workflowID, err)
-		}
+		fmt.Printf("scheduler: workflow %s execution complete\n", workflowID)
 	}
 }
 

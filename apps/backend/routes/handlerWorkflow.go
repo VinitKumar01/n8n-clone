@@ -71,35 +71,32 @@ func (db Db) HandlerGetWorkflowById(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithJson(w, 200, utils.DatabaseWorkflowToWorkflow(workflow))
 }
 
-func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
-	type parameters struct {
-		WorkflowName string               `json:"workflow_name"`
-		UserId       string               `json:"user_id"`
-		Nodes        json.RawMessage      `json:"nodes"`
-		Edges        json.RawMessage      `json:"edges"`
-		Status       utils.WorkflowStatus `json:"status"`
-		WorkflowId   uuid.UUID            `json:"workflow_id"`
+type workflowUpdateParams struct {
+	WorkflowName string               `json:"workflow_name"`
+	UserId       string               `json:"user_id"`
+	Nodes        json.RawMessage      `json:"nodes"`
+	Edges        json.RawMessage      `json:"edges"`
+	Status       utils.WorkflowStatus `json:"status"`
+	WorkflowId   uuid.UUID            `json:"workflow_id"`
+}
+
+func parseWorkflowUpdateParams(r *http.Request) (*workflowUpdateParams, error) {
+	var params workflowUpdateParams
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		return nil, fmt.Errorf("error parsing json: %w", err)
 	}
+	return &params, nil
+}
 
-	decoder := json.NewDecoder(r.Body)
-
-	params := parameters{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		utils.RespondWithError(w, 400, fmt.Sprintf("Error parsing json: %v", err))
-		return
-	}
-
+func calculateWorkflowMetadata(nodesJSON, edgesJSON json.RawMessage) (edgesJSONRaw, inDegreeJSONRaw, startNodesJSONRaw []byte, err error) {
 	var nodes []utils.Node
-	if err := json.Unmarshal(params.Nodes, &nodes); err != nil {
-		utils.RespondWithError(w, 400, fmt.Sprintf("Error parsing nodes: %v", err))
-		return
+	if err = json.Unmarshal(nodesJSON, &nodes); err != nil {
+		return nil, nil, nil, fmt.Errorf("error parsing nodes: %w", err)
 	}
 
 	var edges []utils.Edge
-	if err := json.Unmarshal(params.Edges, &edges); err != nil {
-		utils.RespondWithError(w, 400, fmt.Sprintf("Error parsing edges: %v", err))
-		return
+	if err = json.Unmarshal(edgesJSON, &edges); err != nil {
+		return nil, nil, nil, fmt.Errorf("error parsing edges: %w", err)
 	}
 
 	dag := utils.BuildDAG(nodes, edges)
@@ -119,14 +116,16 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	edgesJSON, _ := json.Marshal(workflowMetadata.Edges)
-	inDegreeJSON, _ := json.Marshal(workflowMetadata.InDegree)
-	startNodesJSON, _ := json.Marshal(workflowMetadata.StartNodes)
+	edgesJSONRaw, _ = json.Marshal(workflowMetadata.Edges)
+	inDegreeJSONRaw, _ = json.Marshal(workflowMetadata.InDegree)
+	startNodesJSONRaw, _ = json.Marshal(workflowMetadata.StartNodes)
+	return edgesJSONRaw, inDegreeJSONRaw, startNodesJSONRaw, nil
+}
 
-	tx, err := db.DB.BeginTx(r.Context(), nil)
+func (db Db) dbUpdateWorkflowTx(ctx context.Context, params *workflowUpdateParams, edgesJSON, inDegreeJSON, startNodesJSON []byte) (database.Workflow, error) {
+	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
-		utils.RespondWithError(w, 500, "Failed to start transaction")
-		return
+		return database.Workflow{}, fmt.Errorf("failed to start transaction: %w", err)
 	}
 
 	var qtx database.Querier = db.Queries
@@ -134,7 +133,7 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		qtx = concreteQueries.WithTx(tx)
 	}
 
-	err = qtx.UpsertWorkflowMetadata(r.Context(), database.UpsertWorkflowMetadataParams{
+	err = qtx.UpsertWorkflowMetadata(ctx, database.UpsertWorkflowMetadataParams{
 		WorkflowID: params.WorkflowId,
 		Edges:      edgesJSON,
 		InDegree:   inDegreeJSON,
@@ -142,11 +141,10 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		rollbackErr := tx.Rollback()
-		utils.RespondWithError(w, 500, fmt.Sprintf("Metadata save failed: %v %v", err, rollbackErr))
-		return
+		return database.Workflow{}, fmt.Errorf("Metadata save failed: %v %v", err, rollbackErr)
 	}
 
-	workflow, err := qtx.UpdateWorkflowById(r.Context(), database.UpdateWorkflowByIdParams{
+	workflow, err := qtx.UpdateWorkflowById(ctx, database.UpdateWorkflowByIdParams{
 		WorkflowName: params.WorkflowName,
 		Nodes:        params.Nodes,
 		Edges:        params.Edges,
@@ -157,16 +155,17 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		rollbackErr := tx.Rollback()
-		utils.RespondWithError(w, 400, fmt.Sprintf("Error updating the workflow: %v %v", err, rollbackErr))
-		return
+		return database.Workflow{}, fmt.Errorf("Error updating the workflow: %v %v", err, rollbackErr)
 	}
 
 	if err := tx.Commit(); err != nil {
-		utils.RespondWithError(w, 500, "Commit failed")
-		return
+		return database.Workflow{}, fmt.Errorf("Commit failed")
 	}
 
-	// Re-register active webhooks and schedulers to pick up any node/edge/interval edits
+	return workflow, nil
+}
+
+func refreshWorkflowTriggers(ctx context.Context, q database.Querier, workflow database.Workflow) {
 	utils.UnregisterWebhooksForWorkflow(workflow.ID)
 	utils.StopWorkflowSchedulers(workflow.ID)
 
@@ -174,10 +173,32 @@ func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
 		if err := utils.RegisterWebhooksForWorkflow(workflow.ID, workflow.Nodes); err != nil {
 			fmt.Printf("failed to re-register webhooks for active workflow %s: %v\n", workflow.ID, err)
 		}
-		if err := utils.RegisterSchedulersForWorkflow(context.Background(), db.Queries, workflow.ID, workflow.Nodes, workflow.Status); err != nil {
+		if err := utils.RegisterSchedulersForWorkflow(ctx, q, workflow.ID, workflow.Nodes, workflow.Status); err != nil {
 			fmt.Printf("failed to re-register schedulers for active workflow %s: %v\n", workflow.ID, err)
 		}
 	}
+}
+
+func (db Db) HandlerUpdateWorkflow(w http.ResponseWriter, r *http.Request) {
+	params, err := parseWorkflowUpdateParams(r)
+	if err != nil {
+		utils.RespondWithError(w, 400, err.Error())
+		return
+	}
+
+	edgesJSON, inDegreeJSON, startNodesJSON, err := calculateWorkflowMetadata(params.Nodes, params.Edges)
+	if err != nil {
+		utils.RespondWithError(w, 400, err.Error())
+		return
+	}
+
+	workflow, err := db.dbUpdateWorkflowTx(r.Context(), params, edgesJSON, inDegreeJSON, startNodesJSON)
+	if err != nil {
+		utils.RespondWithError(w, 500, err.Error())
+		return
+	}
+
+	refreshWorkflowTriggers(r.Context(), db.Queries, workflow)
 
 	utils.RespondWithJson(w, 201, utils.DatabaseWorkflowToWorkflow(workflow))
 }
