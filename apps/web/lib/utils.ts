@@ -14,6 +14,8 @@ type Workflow = {
   edges: Edge[];
   status: "active" | "not-active";
   user_id: string;
+  created_at: string;
+  updated_at: string;
 };
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;

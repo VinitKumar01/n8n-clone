@@ -2,7 +2,6 @@ import { create } from "zustand";
 import {
   Connection,
   Edge,
-  Node,
   NodeChange,
   EdgeChange,
   addEdge,
@@ -11,37 +10,10 @@ import {
   XYPosition,
 } from "reactflow";
 import axios from "axios";
-
-export type GeminiInputs = {
-  apiKey?: string;
-  model?: string;
-  prompt?: string;
-};
-
-export type ResendInputs = {
-  apiKey?: string;
-  from?: string;
-  to?: string;
-  subject?: string;
-};
-
-export type AppNodeData = {
-  inputs?: {
-    apiKey?: string;
-    model?: string;
-    prompt?: string;
-    interval?: string;
-    from?: string;
-    to?: string;
-    subject?: string;
-  };
-  received?: unknown;
-};
-
-export type AppNode = Node<AppNodeData>;
+import { useToastStore } from "./useToastStore";
+import { AppNode, AppNodeData } from "@/types/workflow";
 
 interface WorkflowState {
-  // Store States
   nodes: AppNode[];
   edges: Edge[];
   workflowId: string | null;
@@ -51,12 +23,10 @@ interface WorkflowState {
   lastSavedState: { nodes: AppNode[]; edges: Edge[] } | null;
   isLoading: boolean;
 
-  // Setters
   setWorkflowId: (id: string | null) => void;
   setWorkflowNameState: (name: string) => void;
   setStatusState: (status: boolean) => void;
 
-  // ReactFlow Canvas actions
   initWorkflow: (id: string) => Promise<void>;
   initNewWorkflow: () => void;
   onNodesChange: (changes: NodeChange[]) => void;
@@ -66,7 +36,6 @@ interface WorkflowState {
   updateNodeData: (nodeId: string, dataUpdate: Partial<AppNodeData>) => void;
   updateNodeReceived: (nodeId: string, payload: unknown) => void;
 
-  // API Actions
   saveWorkflow: (userId: string) => Promise<string | undefined>;
   toggleWorkflowStatus: (userId: string) => Promise<void>;
   executeWorkflow: (userId: string, startNodeId: string) => Promise<void>;
@@ -126,7 +95,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         });
       }
     } catch (error) {
-      console.error("Failed to load workflow:", error);
+      console.error(error);
     } finally {
       set({ isLoading: false });
     }
@@ -136,7 +105,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     set((state) => {
       const updatedNodes = applyNodeChanges(changes, state.nodes) as AppNode[];
 
-      // Compute dirtiness by comparing to lastSavedState
       let isSaved = state.isSaved;
       if (state.lastSavedState) {
         const nodesChanged =
@@ -251,10 +219,12 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   saveWorkflow: async (userId) => {
     const { nodes, edges, status, workflowName, workflowId } = get();
+    const toastId = useToastStore
+      .getState()
+      .addToast("Saving workflow...", "loading", 0);
 
     try {
       if (!workflowId) {
-        // Create new workflow
         const response = await axios.post(`${BACKEND_URL}/workflow`, {
           workflow_name: workflowName,
           user_id: userId,
@@ -270,10 +240,14 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
             lastSavedState: { nodes, edges },
             isSaved: true,
           });
+          useToastStore.getState().updateToast(toastId, {
+            message: "Workflow created and saved successfully!",
+            type: "success",
+            duration: 3000,
+          });
           return newId;
         }
       } else {
-        // Update existing workflow
         await axios.put(`${BACKEND_URL}/workflow`, {
           workflow_name: workflowName,
           user_id: userId,
@@ -287,9 +261,19 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
           lastSavedState: { nodes, edges },
           isSaved: true,
         });
+        useToastStore.getState().updateToast(toastId, {
+          message: "Workflow saved successfully!",
+          type: "success",
+          duration: 3000,
+        });
       }
     } catch (error) {
-      console.error("Failed to save workflow:", error);
+      console.error(error);
+      useToastStore.getState().updateToast(toastId, {
+        message: `Failed to save workflow: ${error instanceof Error ? error.message : String(error)}`,
+        type: "error",
+        duration: 3000,
+      });
     }
     return undefined;
   },
@@ -299,6 +283,11 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     if (!workflowId) return;
 
     const newStatus = status ? "not-active" : "active";
+    const actionText = status ? "Deactivating" : "Activating";
+    const toastId = useToastStore
+      .getState()
+      .addToast(`${actionText} workflow...`, "loading", 0);
+
     try {
       const response = await fetch(`${BACKEND_URL}/workflow/status`, {
         method: "POST",
@@ -314,19 +303,38 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
       if (!response.ok) {
         const text = await response.text();
-        console.error("Failed to update status on backend:", text);
+        console.error(text);
+        useToastStore.getState().updateToast(toastId, {
+          message: `Failed to update status: ${text}`,
+          type: "error",
+          duration: 3000,
+        });
         return;
       }
 
       set({ status: !status });
+      useToastStore.getState().updateToast(toastId, {
+        message: `Workflow successfully ${status ? "deactivated" : "activated"}!`,
+        type: "success",
+        duration: 3000,
+      });
     } catch (error) {
-      console.error("Failed to toggle status:", error);
+      console.error(error);
+      useToastStore.getState().updateToast(toastId, {
+        message: `Error toggling status: ${error instanceof Error ? error.message : String(error)}`,
+        type: "error",
+        duration: 3000,
+      });
     }
   },
 
   executeWorkflow: async (userId, startNodeId) => {
-    const { workflowId, status } = get();
+    const { workflowId, status, nodes } = get();
     if (!workflowId || !status) return;
+
+    const toastId = useToastStore
+      .getState()
+      .addToast("Triggering workflow execution...", "loading", 0);
 
     try {
       const response = await fetch(
@@ -344,20 +352,63 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       );
 
       if (!response.ok) {
-        const text = await response.text();
-        console.error("Execution failed:", response.status, text);
+        let errMsg = "Workflow execution failed.";
+        try {
+          const errorBody = await response.json();
+          errMsg = errorBody.error || errMsg;
+        } catch {
+          try {
+            const text = await response.text();
+            errMsg = text || errMsg;
+          } catch {}
+        }
+
+        let failedNodeDetail = "";
+        const nodeMatch = errMsg.match(/Node\s+(\d+)\s+\(([^)]+)\)\s+failed/i);
+        if (nodeMatch) {
+          const nodeId = nodeMatch[1];
+          const nodeType = nodeMatch[2];
+          const targetNode = nodes.find((n) => n.id === nodeId);
+          const displayName =
+            targetNode?.type === "geminiNode"
+              ? "Gemini AI"
+              : targetNode?.type === "resendNode"
+                ? "Send Email"
+                : targetNode?.type === "webhookNode"
+                  ? "Webhook"
+                  : targetNode?.type === "schedulerNode"
+                    ? "Scheduler"
+                    : nodeType;
+          failedNodeDetail = ` at node '${displayName}' (ID: ${nodeId})`;
+        }
+
+        useToastStore.getState().updateToast(toastId, {
+          message: `Execution failed${failedNodeDetail}: ${errMsg.replace(/Node\s+\d+\s+\([^)]+\)\s+failed:\s*/i, "")}`,
+          type: "error",
+          duration: 3000,
+        });
         return;
       }
 
       const body = await response.json();
       const results = body.results ?? {};
 
-      // Update output payload on each node returned in results
       Object.entries(results).forEach(([id, payload]) => {
         get().updateNodeReceived(id, payload);
       });
+
+      useToastStore.getState().updateToast(toastId, {
+        message: "Workflow executed successfully!",
+        type: "success",
+        duration: 3000,
+      });
     } catch (error) {
-      console.error("Error executing workflow:", error);
+      console.error(error);
+      useToastStore.getState().updateToast(toastId, {
+        message: `Connection error: ${error instanceof Error ? error.message : String(error)}`,
+        type: "error",
+        duration: 3000,
+      });
     }
   },
 }));

@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import NodesBar from "@/components/NodesBar";
 import { auth } from "@clerk/nextjs/server";
 import { DM_Serif_Display, IBM_Plex_Mono } from "next/font/google";
+import { Toaster } from "@/components/ui/toaster";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function RootLayout({
   }
 
   return (
-    <ClerkProvider>
+    <ClerkProvider afterSignOutUrl="/">
       <ThemeProvider
         attribute="class"
         defaultTheme="system"
@@ -40,6 +41,7 @@ export default async function RootLayout({
           className={`${dmSerif.variable} ${ibmMono.variable} antialiased h-screen flex justify-start w-full`}
         >
           <NodesBar>{children}</NodesBar>
+          <Toaster />
         </div>
       </ThemeProvider>
     </ClerkProvider>

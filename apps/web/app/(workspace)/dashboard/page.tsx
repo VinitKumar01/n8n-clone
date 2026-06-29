@@ -1,10 +1,16 @@
 "use client";
 
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { getWorkflows } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
-import { ChevronLeft, ChevronRight, Pencil, Trash } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Trash,
+  Plus,
+  FolderOpen,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import type { Edge, Node } from "reactflow";
@@ -28,6 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import axios from "axios";
+import { useToastStore } from "@/hooks/useToastStore";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -38,23 +45,29 @@ type Workflow = {
   edges: Edge[];
   status: "active" | "not-active";
   user_id: string;
+  created_at: string;
+  updated_at: string;
 };
 
 const PAGE_SIZE = 6;
 
 function WorkflowCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-white/5 bg-white/3 p-5 shadow-sm">
-      <div className="space-y-3">
-        <Skeleton className="h-6 w-3/5 rounded-md bg-white/10" />
-        <Skeleton className="h-4 w-2/5 rounded-md bg-white/10" />
+    <div className="flex h-[200px] flex-col justify-between rounded-xl border border-white/5 bg-[#262626] p-5 shadow-lg">
+      <div className="flex flex-col gap-2">
+        <div className="h-6 w-3/4 animate-pulse rounded bg-neutral-700/60" />
+        <div className="h-4 w-1/2 animate-pulse rounded bg-neutral-700/60" />
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="h-4 w-1/4 animate-pulse rounded bg-neutral-700/60" />
+        <div className="h-8 w-1/3 animate-pulse rounded bg-neutral-700/60" />
       </div>
     </div>
   );
 }
 
-export default function DashboardPage() {
-  const { user } = useUser();
+export default function Dashboard() {
+  const { isLoaded, user } = useUser();
   const router = useRouter();
 
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -71,15 +84,30 @@ export default function DashboardPage() {
       try {
         setLoading(true);
         const data = await getWorkflows(user?.id as string);
-        setWorkflows(data);
+        // Sort workflows by updated_at (descending) to ensure stable and consistent ordering
+        const sorted = data.sort((a, b) => {
+          const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+          const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+          return timeB - timeA;
+        });
+        setWorkflows(sorted);
       } finally {
         setLoading(false);
       }
     };
 
-    if (user?.id) fetchWorkflows();
-    else setLoading(false);
-  }, [user?.id]);
+    if (!isLoaded) {
+      setLoading(true);
+      return;
+    }
+
+    if (user?.id) {
+      fetchWorkflows();
+    } else {
+      setWorkflows([]);
+      setLoading(false);
+    }
+  }, [isLoaded, user?.id]);
 
   useEffect(() => {
     setPage(1);
@@ -96,26 +124,26 @@ export default function DashboardPage() {
   const canGoNext = page < totalPages;
 
   return (
-    <div className="min-h-screen w-full bg-[#1d1d1d] px-4 py-6 text-[#E5E5E5] sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl rounded-2xl border border-white/5 bg-[#262626] shadow-2xl shadow-black/20">
+    <div className="min-h-screen w-full bg-neutral-50 dark:bg-[#171717] px-4 py-6 text-neutral-900 dark:text-[#E5E5E5] sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl rounded-2xl border border-neutral-200 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/60 shadow-md dark:shadow-2xl dark:shadow-black/20">
         <div className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
           <div>
-            <div className="text-3xl font-semibold tracking-tight">
+            <div className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white">
               My Workflows
             </div>
-            <div className="mt-1 text-sm text-white/55">
+            <div className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
               Manage your workflows from one place.
             </div>
           </div>
 
-          <div className="text-sm text-white/45">
+          <div className="text-sm text-neutral-500 dark:text-neutral-400">
             {loading
               ? "Loading workflows..."
               : `${workflows.length} workflow${workflows.length === 1 ? "" : "s"}`}
           </div>
         </div>
 
-        <Separator className="bg-white/8" />
+        <Separator className="bg-neutral-200 dark:bg-neutral-800" />
 
         <div className="p-5 sm:p-6">
           {loading ? (
@@ -137,13 +165,13 @@ export default function DashboardPage() {
                       onClick={() => {
                         router.push(`/workflow/${workflow.id}`);
                       }}
-                      className="group rounded-2xl border border-white/5 bg-[#1f1f1f] p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-white/10 hover:bg-[#222] hover:shadow-lg hover:shadow-black/20 focus:outline-none focus:ring-2 focus:ring-white/10 cursor-pointer"
+                      className="group rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1f1f1f] p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50/50 dark:hover:bg-[#222]/80 hover:shadow-md dark:hover:shadow-black/20 focus:outline-none focus:ring-2 focus:ring-neutral-400 dark:focus:ring-neutral-800 cursor-pointer"
                     >
                       <div className="flex h-full flex-col justify-between gap-5">
                         <div className="space-y-3 w-full">
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <h3 className="line-clamp-1 text-xl font-semibold tracking-tight text-[#E5E5E5] break-all">
+                              <h3 className="line-clamp-1 text-xl font-semibold tracking-tight text-neutral-800 dark:text-neutral-200 break-all">
                                 {workflow.workflow_name}
                               </h3>
                               <span
@@ -153,7 +181,7 @@ export default function DashboardPage() {
                                 }}
                                 role="button"
                                 title="Rename workflow"
-                                className="p-1 rounded-md text-white/35 hover:text-white/80 hover:bg-white/5 opacity-0 group-hover:opacity-100 transition duration-150 cursor-pointer shrink-0"
+                                className="p-1 rounded-md text-neutral-400 dark:text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100 transition duration-150 cursor-pointer shrink-0"
                               >
                                 <Pencil size={14} />
                               </span>
@@ -172,20 +200,20 @@ export default function DashboardPage() {
                             <span
                               className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
                                 isActive
-                                  ? "border-green-500/20 bg-green-500/10 text-green-400"
-                                  : "border-orange-400/20 bg-orange-400/10 text-orange-300"
+                                  ? "border-green-500/20 bg-green-500/10 text-green-600 dark:text-green-400"
+                                  : "border-orange-500/20 bg-orange-500/10 text-orange-600 dark:text-orange-400"
                               }`}
                             >
                               {workflow.status}
                             </span>
                           </div>
 
-                          <div className="text-sm text-white/45">
+                          <div className="text-sm text-neutral-400 dark:text-neutral-500">
                             id: {workflow.id}
                           </div>
                         </div>
 
-                        <div className="text-sm text-white/35 transition group-hover:text-white/50">
+                        <div className="text-sm text-neutral-500 dark:text-neutral-400 transition group-hover:text-neutral-800 dark:group-hover:text-neutral-200">
                           Open workflow →
                         </div>
                       </div>
@@ -194,8 +222,8 @@ export default function DashboardPage() {
                 })}
               </div>
 
-              <div className="mt-6 flex flex-col gap-3 border-t border-white/5 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-white/45">
+              <div className="mt-6 flex flex-col gap-3 border-t border-neutral-200 dark:border-neutral-800/80 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-neutral-500 dark:text-neutral-400">
                   Page {page} of {totalPages}
                 </div>
 
@@ -204,13 +232,13 @@ export default function DashboardPage() {
                     type="button"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={!canGoPrev}
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#E5E5E5] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex items-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-200 transition hover:bg-neutral-200 dark:hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                   >
                     <ChevronLeft size={16} />
                     Prev
                   </button>
 
-                  <div className="min-w-10 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-white/70">
+                  <div className="min-w-10 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 px-3 py-2 text-center text-sm font-medium text-neutral-800 dark:text-neutral-200">
                     {page}
                   </div>
 
@@ -218,7 +246,7 @@ export default function DashboardPage() {
                     type="button"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={!canGoNext}
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-[#E5E5E5] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex items-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-200 transition hover:bg-neutral-200 dark:hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                   >
                     Next
                     <ChevronRight size={16} />
@@ -227,14 +255,27 @@ export default function DashboardPage() {
               </div>
             </>
           ) : (
-            <div className="flex min-h-72 items-center justify-center">
-              <div className="w-full max-w-lg rounded-2xl border border-white/5 bg-white/3 px-6 py-10 text-center shadow-sm">
-                <div className="text-3xl font-semibold text-[#E5E5E5]">
-                  OOPS!! No workflows found
+            <div className="flex min-h-[400px] items-center justify-center py-6">
+              <div className="w-full max-w-md rounded-2xl border border-neutral-200 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/30 p-8 text-center shadow-xs flex flex-col items-center justify-center gap-5">
+                <div className="h-12 w-12 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-sm">
+                  <FolderOpen className="h-6 w-6" />
                 </div>
-                <div className="mt-2 text-sm text-white/45">
-                  Create a workflow to see it listed here.
+                <div className="space-y-1.5">
+                  <h3 className="text-xl font-bold text-neutral-800 dark:text-[#E5E5E5]">
+                    No Workflows Found
+                  </h3>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-xs leading-relaxed">
+                    You haven&apos;t designed any workflows yet. Get started by
+                    designing your first automation process on the canvas.
+                  </p>
                 </div>
+                <Button
+                  onClick={() => router.push("/workspace")}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Create New Workflow
+                </Button>
               </div>
             </div>
           )}
@@ -269,6 +310,9 @@ export default function DashboardPage() {
                   const newName = newNameRef.current?.value || "";
                   if (!editingWorkflow || !newName.trim() || !BACKEND_URL)
                     return;
+                  const toastId = useToastStore
+                    .getState()
+                    .addToast("Renaming workflow...", "loading", 0);
                   try {
                     await axios.put(`${BACKEND_URL}/workflow`, {
                       workflow_name: newName.trim(),
@@ -287,8 +331,18 @@ export default function DashboardPage() {
                       ),
                     );
                     setEditingWorkflow(null);
+                    useToastStore.getState().updateToast(toastId, {
+                      message: "Workflow renamed successfully!",
+                      type: "success",
+                      duration: 3000,
+                    });
                   } catch (error) {
                     console.error("Failed to rename workflow:", error);
+                    useToastStore.getState().updateToast(toastId, {
+                      message: `Failed to rename workflow: ${error instanceof Error ? error.message : String(error)}`,
+                      type: "error",
+                      duration: 4000,
+                    });
                   }
                 }}
               >
@@ -322,6 +376,9 @@ export default function DashboardPage() {
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={async () => {
                 if (!deletingWorkflow || !BACKEND_URL) return;
+                const toastId = useToastStore
+                  .getState()
+                  .addToast("Deleting workflow...", "loading", 0);
                 try {
                   await axios.delete(
                     `${BACKEND_URL}/workflow/${deletingWorkflow.id}?userId=${deletingWorkflow.user_id}`,
@@ -330,8 +387,18 @@ export default function DashboardPage() {
                     prev.filter((w) => w.id !== deletingWorkflow.id),
                   );
                   setDeletingWorkflow(null);
+                  useToastStore.getState().updateToast(toastId, {
+                    message: "Workflow deleted successfully!",
+                    type: "success",
+                    duration: 3000,
+                  });
                 } catch (error) {
                   console.error("Failed to delete workflow:", error);
+                  useToastStore.getState().updateToast(toastId, {
+                    message: `Failed to delete workflow: ${error instanceof Error ? error.message : String(error)}`,
+                    type: "error",
+                    duration: 4000,
+                  });
                 }
               }}
             >

@@ -159,48 +159,48 @@ sequenceDiagram
 
 1. **Frontend Action**: Clicking on `triggerManually` calls `executeWorkflow` in [useWorkflowStore.ts](apps/web/hooks/useWorkflowStore.ts):
 
-    ```typescript
-    const response = await fetch(
-      `${BACKEND_URL}/workflow/${workflowId}/execute`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startNode: startNodeId, userId }),
-      },
-    );
-    ```
+   ```typescript
+   const response = await fetch(
+     `${BACKEND_URL}/workflow/${workflowId}/execute`,
+     {
+       method: "POST",
+       headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({ startNode: startNodeId, userId }),
+     },
+   );
+   ```
 
 2. **Backend Handler**: Received in Go at `HandlerWorkflowExecute` ([handlerWorkflowExecute.go](apps/backend/routes/handlerWorkflowExecute.go)).
 3. **Metadata Parsing**: DB returns precompiled metadata via SQLC queries. The JSON columns `edges` and `inDegree` are converted into the in-memory struct:
 
-    ```go
-    dag := &utils.DAG{
-        Nodes:    make(map[string]utils.Node),
-        Edges:    edges, // e.g. {"1": ["2", "3"]}
-        InDegree: make(map[string]int),
-    }
-    ```
+   ```go
+   dag := &utils.DAG{
+       Nodes:    make(map[string]utils.Node),
+       Edges:    edges, // e.g. {"1": ["2", "3"]}
+       InDegree: make(map[string]int),
+   }
+   ```
 
-    > [!NOTE]
-    > **Reachable Subgraph Execution**: During execution context initialization, the engine traverses the DAG using Depth-First Search (DFS) starting from the `startNode` to identify all reachable nodes. The context-level in-degree map (`execCtx.InDegree`) is built only for these reachable nodes, ignoring incoming edges from unreachable nodes. This prevents execution from getting stuck on downstream nodes that have dependencies on parts of the workflow that are not being run.
+   > [!NOTE]
+   > **Reachable Subgraph Execution**: During execution context initialization, the engine traverses the DAG using Depth-First Search (DFS) starting from the `startNode` to identify all reachable nodes. The context-level in-degree map (`execCtx.InDegree`) is built only for these reachable nodes, ignoring incoming edges from unreachable nodes. This prevents execution from getting stuck on downstream nodes that have dependencies on parts of the workflow that are not being run.
 
 4. **Running Node Queue**: The start node runs first. Then, children are processed using the thread pool worker queue:
 
-    ```go
-    queue := utils.NewTaskQueue(100)
-    queue.StartWorkers(ctx, 4, func(ctx context.Context, nodeID string) error {
-        // Execute the individual node
-        if err := utils.ExecuteNode(ctx, nodeID, dag, execCtx); err != nil { ... }
-        // Decrement child indegrees and enqueue children if they hit 0
-        for _, child := range dag.Edges[nodeID] {
-            execCtx.InDegree[child]--
-            if execCtx.InDegree[child] == 0 {
-                queue.Enqueue(child)
-            }
-        }
-        return nil
-    })
-    ```
+   ```go
+   queue := utils.NewTaskQueue(100)
+   queue.StartWorkers(ctx, 4, func(ctx context.Context, nodeID string) error {
+       // Execute the individual node
+       if err := utils.ExecuteNode(ctx, nodeID, dag, execCtx); err != nil { ... }
+       // Decrement child indegrees and enqueue children if they hit 0
+       for _, child := range dag.Edges[nodeID] {
+           execCtx.InDegree[child]--
+           if execCtx.InDegree[child] == 0 {
+               queue.Enqueue(child)
+           }
+       }
+       return nil
+   })
+   ```
 
 5. **Output Aggregation**: When `queue.Wait()` releases, the server replies with JSON containing the aggregated data map `Results` of all executing blocks.
 6. **Store Refresh**: Frontend store applies output data back into node attributes (`node.data.received`), triggering reactive visual renders of output text fields.
@@ -215,9 +215,9 @@ For workflows containing a `webhookNode` and marked `active`:
 2. **Request Handling**: An external client makes a POST request to `/webhook/{workflowID}/{nodeID}` with a custom JSON body.
 3. **Mapping**: The routing engine intercepts the request inside `HandlerWorkflowWebhook` ([handlerWorkflowWebhook.go](apps/backend/routes/handlerWorkflowWebhook.go)), verifying the route exists.
 4. **Execution**:
-    - It extracts the request JSON payload.
-    - It pre-populates the webhook start node results: `execCtx.Results[nodeID] = map[string]any{"payload": payload}`.
-    - It triggers downstream tasks in parallel, identical to manual execution.
+   - It extracts the request JSON payload.
+   - It pre-populates the webhook start node results: `execCtx.Results[nodeID] = map[string]any{"payload": payload}`.
+   - It triggers downstream tasks in parallel, identical to manual execution.
 5. **Termination**: Returns HTTP 200 once execution completes.
 
 ---
@@ -229,16 +229,16 @@ For workflows containing an active `schedulerNode`:
 1. **Goroutine Timer Initialization**: During server startup or workflow status toggles to `active`, the engine parses Go duration settings (e.g. `5m`, `30s`) and invokes `GlobalScheduler.StartSchedule(...)` ([periodicScheduler.go](apps/backend/utils/periodicScheduler.go)).
 2. **Cron Thread Ticker**: Spawns a background goroutine loop running a `time.Ticker`:
 
-    ```go
-    go func() {
-        for {
-            select {
-            case <-stop: return
-            case t := <-ticker.C:
-                trigger(ctx, event) // Run buildTriggerFn
-            }
-        }
-    }()
-    ```
+   ```go
+   go func() {
+       for {
+           select {
+           case <-stop: return
+           case t := <-ticker.C:
+               trigger(ctx, event) // Run buildTriggerFn
+           }
+       }
+   }()
+   ```
 
 3. **Database Execution**: When triggered, it queries DB nodes, builds the execution context, executes the scheduler node, and maps downstream children to parallel task workers in the background.

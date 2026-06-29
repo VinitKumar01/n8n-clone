@@ -161,9 +161,10 @@ func ExecuteWorkflow(
 	queue.StartWorkers(ctxCancel, 4, func(ctx context.Context, nodeID string) error {
 		fmt.Println("[worker-wrapper] received job:", nodeID)
 		if err := ExecuteNode(ctx, nodeID, dag, execCtx); err != nil {
-			errCh <- err
+			wrappedErr := fmt.Errorf("Node %s (%s) failed: %w", nodeID, dag.Nodes[nodeID].Type, err)
+			errCh <- wrappedErr
 			cancel()
-			return err
+			return wrappedErr
 		}
 
 		mu.Lock()

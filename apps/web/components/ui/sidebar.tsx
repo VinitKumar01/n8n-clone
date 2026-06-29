@@ -31,18 +31,18 @@ export const useSidebar = () => {
 export const SidebarProvider = ({
   children,
   open: openProp,
-  setOpen: setOpenProp,
+  setOpenAction,
   animate = true,
 }: {
   children: React.ReactNode;
   open?: boolean;
-  setOpen?: React.Dispatch<React.SetStateAction<boolean>>;
+  setOpenAction?: React.Dispatch<React.SetStateAction<boolean>>;
   animate?: boolean;
 }) => {
   const [openState, setOpenState] = useState(false);
 
   const open = openProp !== undefined ? openProp : openState;
-  const setOpen = setOpenProp !== undefined ? setOpenProp : setOpenState;
+  const setOpen = setOpenAction !== undefined ? setOpenAction : setOpenState;
 
   return (
     <SidebarContext.Provider value={{ open, setOpen, animate: animate }}>
@@ -54,16 +54,20 @@ export const SidebarProvider = ({
 export const Sidebar = ({
   children,
   open,
-  setOpen,
+  setOpenAction,
   animate,
 }: {
   children: React.ReactNode;
   open?: boolean;
-  setOpen?: React.Dispatch<React.SetStateAction<boolean>>;
+  setOpenAction?: React.Dispatch<React.SetStateAction<boolean>>;
   animate?: boolean;
 }) => {
   return (
-    <SidebarProvider open={open} setOpen={setOpen} animate={animate}>
+    <SidebarProvider
+      open={open}
+      setOpenAction={setOpenAction}
+      animate={animate}
+    >
       {children}
     </SidebarProvider>
   );
@@ -88,7 +92,7 @@ export const DesktopSidebar = ({
     <>
       <motion.div
         className={cn(
-          "h-full px-4 py-4 hidden  md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] shrink-0",
+          "h-full px-4 py-4 hidden md:flex md:flex-col bg-white dark:bg-[#171717] border-r border-neutral-200 dark:border-neutral-800/60 w-[300px] shrink-0",
           className,
         )}
         animate={{
@@ -114,7 +118,7 @@ export const MobileSidebar = ({
     <>
       <div
         className={cn(
-          "h-10 px-4 py-4 flex flex-row md:hidden  items-center justify-between bg-neutral-100 dark:bg-neutral-800 w-full",
+          "h-10 px-4 py-4 flex flex-row md:hidden items-center justify-between bg-white dark:bg-[#171717] border-b border-neutral-200 dark:border-neutral-800/60 w-full",
         )}
         {...props}
       >
