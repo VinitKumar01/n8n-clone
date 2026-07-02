@@ -1,12 +1,5 @@
 export default function Connector() {
   return (
-    <div
-      style={{
-        width: "32px",
-        height: "1px",
-        background: "linear-gradient(90deg, #2a2a2a, #444, #2a2a2a)",
-        flexShrink: 0,
-      }}
-    />
+    <div className="w-8 h-[1px] bg-gradient-to-r from-neutral-200 via-neutral-400 to-neutral-200 dark:from-[#2a2a2a] dark:via-[#444] dark:to-[#2a2a2a] shrink-0" />
   );
 }

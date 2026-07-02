@@ -14,6 +14,8 @@ import {
 import { useTheme } from "next-themes";
 import { Sun, Moon, LogIn } from "lucide-react";
 import { motion } from "motion/react";
+import Link from "next/link";
+import Image from "next/image";
 
 export default function NodesBar(props: { children?: React.ReactNode }) {
   const links = [
@@ -64,34 +66,35 @@ export default function NodesBar(props: { children?: React.ReactNode }) {
 
 export const Logo = () => {
   return (
-    <a
+    <Link
       href="/workspace"
-      className="relative z-20 flex items-center space-x-2.5 py-1.5 text-sm font-normal text-black"
+      className="relative z-20 flex items-center py-1.5 text-sm font-normal text-black"
     >
-      <div className="h-6 w-7 bg-neutral-900 dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0 flex items-center justify-center shadow-sm">
-        <span className="text-[11px] font-bold text-white dark:text-neutral-900 select-none">
-          8
-        </span>
-      </div>
-      <span className="font-[var(--font-display)] text-lg tracking-wider dark:text-white text-neutral-800 transition-colors">
-        g8g
-      </span>
-    </a>
+      <Image
+        src="/logo.svg"
+        alt="g8g logo"
+        width={36}
+        height={36}
+        className="dark:invert flex-shrink-0"
+      />
+    </Link>
   );
 };
 
 export const LogoIcon = () => {
   return (
-    <a
+    <Link
       href="/workspace"
       className="relative z-20 flex items-center py-1.5 text-sm font-normal text-black"
     >
-      <div className="h-6 w-7 bg-neutral-900 dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0 flex items-center justify-center shadow-sm">
-        <span className="text-[11px] font-bold text-white dark:text-neutral-900 select-none">
-          8
-        </span>
-      </div>
-    </a>
+      <Image
+        src="/logo.svg"
+        alt="g8g logo"
+        width={36}
+        height={36}
+        className="dark:invert flex-shrink-0"
+      />
+    </Link>
   );
 };
 
