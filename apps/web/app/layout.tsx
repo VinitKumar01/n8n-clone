@@ -36,9 +36,9 @@ export const metadata: Metadata = {
     siteName: "g8g",
     images: [
       {
-        url: "/web-app-manifest-512x512.png",
-        width: 512,
-        height: 512,
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
         alt: "g8g - Go-based Visual Workflow Automation",
       },
     ],
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     title: "g8g — Go based Visual Workflow Automation",
     description:
       "Build, schedule, and automate workflows visually. Connect AI, webhooks, and email into powerful pipelines.",
-    images: ["/web-app-manifest-512x512.png"],
+    images: ["/og-image.png"],
     creator: "@g8g_dev",
   },
   robots: {
